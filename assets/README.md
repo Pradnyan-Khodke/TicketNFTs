@@ -1,0 +1,1 @@
+Static assets for sample ticket images, metadata examples, and related project resources.

@@ -1,0 +1,1 @@
+Frontend application for wallet connection and NFT ticket interaction.
