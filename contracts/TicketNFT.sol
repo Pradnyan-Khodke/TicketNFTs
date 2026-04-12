@@ -1,10 +1,35 @@
-// SPDX-License-Identifier: MIT 
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.28;
 
-contract TicketNFT {
-    // TODO:
-    // - inherit from OpenZeppelin ERC721
-    // - support minting
-    // - track redemption status
-    // - add token metadata URI handling
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract TicketNFT is ERC721, Ownable {
+    uint256 private _nextTokenId;
+    mapping(uint256 => bool) private _redeemed;
+
+    constructor(address initialOwner)
+        ERC721("TicketNFT", "TNFT")
+        Ownable(initialOwner)
+    {}
+
+    function mintTicket(address to) external onlyOwner returns (uint256) {
+        uint256 tokenId = _nextTokenId;
+        _nextTokenId++;
+
+        _safeMint(to, tokenId);
+        return tokenId;
+    }
+
+    function redeem(uint256 tokenId) external {
+        require(ownerOf(tokenId) == msg.sender, "Not ticket owner");
+        require(!_redeemed[tokenId], "Ticket already redeemed");
+
+        _redeemed[tokenId] = true;
+    }
+
+    function isRedeemed(uint256 tokenId) external view returns (bool) {
+        _requireOwned(tokenId);
+        return _redeemed[tokenId];
+    }
 }
