@@ -8,7 +8,9 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "hardhat build",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.ts"
   },
   "repository": {
     "type": "git",

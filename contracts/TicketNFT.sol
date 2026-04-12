@@ -6,18 +6,22 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TicketNFT is ERC721, Ownable {
     uint256 private _nextTokenId;
+
     mapping(uint256 => bool) private _redeemed;
+    mapping(uint256 => string) private _tokenURIs;
 
     constructor(address initialOwner)
         ERC721("TicketNFT", "TNFT")
         Ownable(initialOwner)
     {}
 
-    function mintTicket(address to) external onlyOwner returns (uint256) {
+    function mintTicket(address to, string memory uri) external onlyOwner returns (uint256) {
         uint256 tokenId = _nextTokenId;
         _nextTokenId++;
 
         _safeMint(to, tokenId);
+        _tokenURIs[tokenId] = uri;
+
         return tokenId;
     }
 
@@ -31,5 +35,10 @@ contract TicketNFT is ERC721, Ownable {
     function isRedeemed(uint256 tokenId) external view returns (bool) {
         _requireOwned(tokenId);
         return _redeemed[tokenId];
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        return _tokenURIs[tokenId];
     }
 }
