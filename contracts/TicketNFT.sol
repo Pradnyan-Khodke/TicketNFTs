@@ -7,20 +7,35 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract TicketNFT is ERC721, Ownable {
     uint256 private _nextTokenId;
 
+    struct TicketData {
+        uint256 eventId;
+        string ticketType;
+    }
+
     mapping(uint256 => bool) private _redeemed;
     mapping(uint256 => string) private _tokenURIs;
+    mapping(uint256 => TicketData) private _ticketData;
 
     constructor(address initialOwner)
         ERC721("TicketNFT", "TNFT")
         Ownable(initialOwner)
     {}
 
-    function mintTicket(address to, string memory uri) external onlyOwner returns (uint256) {
+    function mintTicket(
+        address to,
+        string memory uri,
+        uint256 eventId,
+        string memory ticketType
+    ) external onlyOwner returns (uint256) {
         uint256 tokenId = _nextTokenId;
         _nextTokenId++;
 
         _safeMint(to, tokenId);
         _tokenURIs[tokenId] = uri;
+        _ticketData[tokenId] = TicketData({
+            eventId: eventId,
+            ticketType: ticketType
+        });
 
         return tokenId;
     }
@@ -37,8 +52,33 @@ contract TicketNFT is ERC721, Ownable {
         return _redeemed[tokenId];
     }
 
+    function getTicketInfo(uint256 tokenId)
+        external
+        view
+        returns (uint256 eventId, string memory ticketType, bool redeemed)
+    {
+        _requireOwned(tokenId);
+
+        TicketData memory ticket = _ticketData[tokenId];
+        return (ticket.eventId, ticket.ticketType, _redeemed[tokenId]);
+    }
+
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
         return _tokenURIs[tokenId];
+    }
+
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override
+        returns (address)
+    {
+        address from = _ownerOf(tokenId);
+
+        if (from != address(0) && to != address(0) && _redeemed[tokenId]) {
+            revert("Redeemed ticket cannot be transferred");
+        }
+
+        return super._update(to, tokenId, auth);
     }
 }
