@@ -10,7 +10,7 @@
   "scripts": {
     "build": "hardhat build",
     "test": "hardhat test",
-    "deploy:local": "hardhat run scripts/deploy.ts"
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost"
   },
   "repository": {
     "type": "git",
