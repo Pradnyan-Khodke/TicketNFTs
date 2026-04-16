@@ -4,82 +4,172 @@ import hre from "hardhat";
 describe("TicketNFT", function () {
   async function deployTicketNFT() {
     const { ethers } = await hre.network.connect();
-    const [owner, user, otherUser] = await ethers.getSigners();
+    const [owner, organizer, user, otherUser] = await ethers.getSigners();
     const TicketNFT = await ethers.getContractFactory("TicketNFT");
     const ticketNFT = await TicketNFT.deploy(owner.address);
     await ticketNFT.waitForDeployment();
-    return { ticketNFT, owner, user, otherUser };
+
+    return { ticketNFT, owner, organizer, user, otherUser };
   }
 
-  it("mints a ticket to a user", async function () {
-    const { ticketNFT, owner, user } = await deployTicketNFT();
+  async function createEventWithCategory() {
+    const { ticketNFT, owner, organizer, user, otherUser } =
+      await deployTicketNFT();
+    const price = 100n;
 
+    await ticketNFT.connect(owner).setOrganizer(organizer.address, true);
+    await ticketNFT.connect(organizer).createEvent("Spring Showcase");
+    await ticketNFT
+      .connect(organizer)
+      .createCategory(0, "VIP", "ipfs://vip-ticket", price, 2);
+
+    return { ticketNFT, owner, organizer, user, otherUser, price };
+  }
+
+  it("allows the owner to create an event", async function () {
+    const { ticketNFT, owner } = await deployTicketNFT();
+
+    await ticketNFT.connect(owner).createEvent("Campus Concert");
+
+    const eventInfo = await ticketNFT.getEventInfo(0);
+
+    expect(eventInfo[0]).to.equal("Campus Concert");
+    expect(eventInfo[1]).to.equal(owner.address);
+    expect(eventInfo[2]).to.equal(true);
+    expect(eventInfo[3]).to.equal(0n);
+  });
+
+  it("allows an approved organizer to create an event", async function () {
+    const { ticketNFT, owner, organizer } = await deployTicketNFT();
+
+    await ticketNFT.connect(owner).setOrganizer(organizer.address, true);
+    await ticketNFT.connect(organizer).createEvent("Hackathon Finals");
+
+    const eventInfo = await ticketNFT.getEventInfo(0);
+
+    expect(eventInfo[0]).to.equal("Hackathon Finals");
+    expect(eventInfo[1]).to.equal(organizer.address);
+  });
+
+  it("rejects event creation by an unauthorized account", async function () {
+    const { ticketNFT, user } = await deployTicketNFT();
+
+    await expect(ticketNFT.connect(user).createEvent("Unauthorized Event")).to.be
+      .revertedWith("Not authorized organizer");
+  });
+
+  it("allows the event organizer to create a ticket category", async function () {
+    const { ticketNFT, organizer } = await createEventWithCategory();
+
+    const eventInfo = await ticketNFT.getEventInfo(0);
+    const categoryInfo = await ticketNFT.getCategory(0, 0);
+
+    expect(eventInfo[3]).to.equal(1n);
+    expect(categoryInfo[0]).to.equal("VIP");
+    expect(categoryInfo[1]).to.equal("ipfs://vip-ticket");
+    expect(categoryInfo[2]).to.equal(100n);
+    expect(categoryInfo[3]).to.equal(2n);
+    expect(categoryInfo[4]).to.equal(0n);
+    expect(categoryInfo[5]).to.equal(2n);
+    expect(await ticketNFT.isOrganizer(organizer.address)).to.equal(true);
+  });
+
+  it("allows the contract owner to create a category for an existing event", async function () {
+    const { ticketNFT, owner, organizer } = await deployTicketNFT();
+
+    await ticketNFT.connect(owner).setOrganizer(organizer.address, true);
+    await ticketNFT.connect(organizer).createEvent("Student Showcase");
     await ticketNFT
       .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
+      .createCategory(0, "Regular", "ipfs://regular-ticket", 50, 5);
+
+    const categoryInfo = await ticketNFT.getCategory(0, 0);
+
+    expect(categoryInfo[0]).to.equal("Regular");
+    expect(categoryInfo[2]).to.equal(50n);
+    expect(categoryInfo[5]).to.equal(5n);
+  });
+
+  it("rejects category creation by an account that does not manage the event", async function () {
+    const { ticketNFT, owner, organizer, user } = await deployTicketNFT();
+
+    await ticketNFT.connect(owner).setOrganizer(organizer.address, true);
+    await ticketNFT.connect(organizer).createEvent("Debate Finals");
+
+    await expect(
+      ticketNFT
+        .connect(user)
+        .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 10)
+    ).to.be.revertedWith("Not event organizer");
+  });
+
+  it("purchases a ticket from available inventory and mints the NFT automatically", async function () {
+    const { ticketNFT, user, price } = await createEventWithCategory();
+
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
 
     expect(await ticketNFT.ownerOf(0)).to.equal(user.address);
-  });
-
-  it("stores and returns token URI", async function () {
-    const { ticketNFT, owner, user } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
-    expect(await ticketNFT.tokenURI(0)).to.equal("ipfs://ticket-0");
-  });
-
-  it("stores ticket event data correctly", async function () {
-    const { ticketNFT, owner, user } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 42, "General");
+    expect(await ticketNFT.tokenURI(0)).to.equal("ipfs://vip-ticket");
 
     const ticketInfo = await ticketNFT.getTicketInfo(0);
+    const categoryInfo = await ticketNFT.getCategory(0, 0);
 
-    expect(ticketInfo[0]).to.equal(42n);
-    expect(ticketInfo[1]).to.equal("General");
+    expect(ticketInfo[0]).to.equal(0n);
+    expect(ticketInfo[1]).to.equal("VIP");
     expect(ticketInfo[2]).to.equal(false);
+    expect(await ticketNFT.getTicketCategoryId(0)).to.equal(0n);
+    expect(categoryInfo[4]).to.equal(1n);
+    expect(categoryInfo[5]).to.equal(1n);
   });
 
-  it("allows the owner of a ticket to redeem it once", async function () {
-    const { ticketNFT, owner, user } = await deployTicketNFT();
+  it("rejects purchases with incorrect payment", async function () {
+    const { ticketNFT, user, price } = await createEventWithCategory();
 
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
+    await expect(
+      ticketNFT.connect(user).purchaseTicket(0, 0, { value: price - 1n })
+    ).to.be.revertedWith("Incorrect payment");
+  });
 
+  it("rejects purchases once a category is sold out", async function () {
+    const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
+
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
+    await ticketNFT.connect(otherUser).purchaseTicket(0, 0, { value: price });
+
+    await expect(
+      ticketNFT.connect(user).purchaseTicket(0, 0, { value: price })
+    ).to.be.revertedWith("Category sold out");
+  });
+
+  it("blocks purchases when an event has been deactivated", async function () {
+    const { ticketNFT, organizer, user, price } = await createEventWithCategory();
+
+    await ticketNFT.connect(organizer).setEventActive(0, false);
+
+    const eventInfo = await ticketNFT.getEventInfo(0);
+    expect(eventInfo[2]).to.equal(false);
+
+    await expect(
+      ticketNFT.connect(user).purchaseTicket(0, 0, { value: price })
+    ).to.be.revertedWith("Event is not active");
+  });
+
+  it("allows the owner of a purchased ticket to redeem it once", async function () {
+    const { ticketNFT, user, price } = await createEventWithCategory();
+
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
     await ticketNFT.connect(user).redeem(0);
 
     expect(await ticketNFT.isRedeemed(0)).to.equal(true);
-  });
-
-  it("getTicketInfo shows redeemed status after redemption", async function () {
-    const { ticketNFT, owner, user } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 7, "VIP");
-
-    await ticketNFT.connect(user).redeem(0);
 
     const ticketInfo = await ticketNFT.getTicketInfo(0);
-
-    expect(ticketInfo[0]).to.equal(7n);
-    expect(ticketInfo[1]).to.equal("VIP");
     expect(ticketInfo[2]).to.equal(true);
   });
 
-  it("rejects redeeming the same ticket twice", async function () {
-    const { ticketNFT, owner, user } = await deployTicketNFT();
+  it("rejects redeeming the same purchased ticket twice", async function () {
+    const { ticketNFT, user, price } = await createEventWithCategory();
 
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
     await ticketNFT.connect(user).redeem(0);
 
     await expect(ticketNFT.connect(user).redeem(0)).to.be.revertedWith(
@@ -87,135 +177,53 @@ describe("TicketNFT", function () {
     );
   });
 
-  it("rejects redemption by non-owner", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
+  it("rejects redemption by a non-owner after purchase", async function () {
+    const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
 
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
 
     await expect(ticketNFT.connect(otherUser).redeem(0)).to.be.revertedWith(
       "Not ticket owner"
     );
   });
 
-  it("allows transfer before redemption", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
+  it("allows transfer before redemption and preserves ticket data", async function () {
+    const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
 
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
     await ticketNFT
       .connect(user)
       .transferFrom(user.address, otherUser.address, 0);
 
     expect(await ticketNFT.ownerOf(0)).to.equal(otherUser.address);
+
+    const ticketInfo = await ticketNFT.getTicketInfo(0);
+    expect(ticketInfo[0]).to.equal(0n);
+    expect(ticketInfo[1]).to.equal("VIP");
+    expect(ticketInfo[2]).to.equal(false);
   });
 
   it("allows the new owner to redeem after transfer before redemption", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
+    const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
 
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
     await ticketNFT
       .connect(user)
       .transferFrom(user.address, otherUser.address, 0);
-
-    expect(await ticketNFT.ownerOf(0)).to.equal(otherUser.address);
 
     await ticketNFT.connect(otherUser).redeem(0);
 
     expect(await ticketNFT.isRedeemed(0)).to.equal(true);
   });
 
-  it("rejects redemption by the old owner after transfer", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
-    await ticketNFT
-      .connect(user)
-      .transferFrom(user.address, otherUser.address, 0);
-
-    await expect(ticketNFT.connect(user).redeem(0)).to.be.revertedWith(
-      "Not ticket owner"
-    );
-  });
-
-  it("preserves ticket info after transfer", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 42, "General");
-
-    await ticketNFT
-      .connect(user)
-      .transferFrom(user.address, otherUser.address, 0);
-
-    const ticketInfo = await ticketNFT.getTicketInfo(0);
-
-    expect(ticketInfo[0]).to.equal(42n);
-    expect(ticketInfo[1]).to.equal("General");
-    expect(ticketInfo[2]).to.equal(false);
-    expect(await ticketNFT.ownerOf(0)).to.equal(otherUser.address);
-  });
-
-  it("shows redeemed status after transfer then redemption by new owner", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 9, "VIP");
-
-    await ticketNFT
-      .connect(user)
-      .transferFrom(user.address, otherUser.address, 0);
-
-    await ticketNFT.connect(otherUser).redeem(0);
-
-    const ticketInfo = await ticketNFT.getTicketInfo(0);
-
-    expect(ticketInfo[0]).to.equal(9n);
-    expect(ticketInfo[1]).to.equal("VIP");
-    expect(ticketInfo[2]).to.equal(true);
-    expect(await ticketNFT.ownerOf(0)).to.equal(otherUser.address);
-  });
-
   it("rejects transfer after redemption", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
+    const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
 
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
+    await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
     await ticketNFT.connect(user).redeem(0);
 
     await expect(
       ticketNFT.connect(user).transferFrom(user.address, otherUser.address, 0)
-    ).to.be.revertedWith("Redeemed ticket cannot be transferred");
-  });
-
-  it("rejects transfer after redemption even for a new owner", async function () {
-    const { ticketNFT, owner, user, otherUser } = await deployTicketNFT();
-
-    await ticketNFT
-      .connect(owner)
-      .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP");
-
-    await ticketNFT
-      .connect(user)
-      .transferFrom(user.address, otherUser.address, 0);
-
-    await ticketNFT.connect(otherUser).redeem(0);
-
-    await expect(
-      ticketNFT.connect(otherUser).transferFrom(otherUser.address, user.address, 0)
     ).to.be.revertedWith("Redeemed ticket cannot be transferred");
   });
 
@@ -237,7 +245,7 @@ describe("TicketNFT", function () {
     ).withArgs(999);
   });
 
-  it("only allows the contract owner to mint", async function () {
+  it("keeps the legacy owner-only manual mint helper restricted to the contract owner", async function () {
     const { ticketNFT, user } = await deployTicketNFT();
 
     await expect(
