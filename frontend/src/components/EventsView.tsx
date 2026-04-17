@@ -54,10 +54,7 @@ export function EventsView({
               <p className="eyebrow">Events</p>
               <h2>Browse available events</h2>
             </div>
-            <p className="support-copy">
-              Select an event to inspect ticket classes and purchase from live
-              inventory.
-            </p>
+            <p className="support-copy">Select an event to view tickets.</p>
           </div>
 
           {events.length === 0 ? (
@@ -175,9 +172,7 @@ export function EventsView({
 
               <div className="section-subheader">
                 <h3>Choose a ticket category</h3>
-                <p className="support-copy">
-                  Purchase mints the NFT directly to the connected wallet.
-                </p>
+                <p className="support-copy">Purchase mints the NFT to your wallet.</p>
               </div>
 
               {selectedEvent.categories.length === 0 ? (
@@ -202,12 +197,35 @@ export function EventsView({
                           onClick={() => onSelectCategory(category.categoryId)}
                           type="button"
                         >
+                          {category.imageUrl ? (
+                            <div className="category-preview">
+                              <img
+                                alt={category.metadataName ?? category.ticketType}
+                                className="category-preview-image"
+                                src={category.imageUrl}
+                              />
+                            </div>
+                          ) : (
+                            <div className="category-preview category-preview-fallback">
+                              <p className="detail-label">
+                                {category.metadataStatus === "error"
+                                  ? "Metadata unavailable"
+                                  : "Preview unavailable"}
+                              </p>
+                              <p className="support-copy">
+                                {category.metadataStatus === "error"
+                                  ? "Could not load metadata from the gateway."
+                                  : "No preview image."}
+                              </p>
+                            </div>
+                          )}
+
                           <div className="event-card-header">
                             <div>
                               <p className="card-kicker">
                                 Category #{category.categoryId}
                               </p>
-                              <h3>{category.ticketType}</h3>
+                              <h3>{category.metadataName ?? category.ticketType}</h3>
                             </div>
                             <span
                               className={`pill ${
@@ -228,7 +246,8 @@ export function EventsView({
                           </div>
 
                           <p className="support-copy wrap">
-                            Metadata {category.metadataURI}
+                            {category.metadataDescription ??
+                              `Metadata ${category.metadataURI}`}
                           </p>
                         </button>
                       );

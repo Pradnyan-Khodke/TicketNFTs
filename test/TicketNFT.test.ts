@@ -63,11 +63,29 @@ describe("TicketNFT", function () {
       expect(await ticketNFT.isOrganizer(organizer.address)).to.equal(true);
     });
 
+    it("tracks the total number of events that have been created", async function () {
+      const { ticketNFT, owner, organizer } = await deployTicketNFT();
+
+      await ticketNFT.connect(owner).createEvent("Campus Concert");
+      await ticketNFT.connect(owner).setOrganizer(organizer.address, true);
+      await ticketNFT.connect(organizer).createEvent("Hackathon Finals");
+
+      expect(await ticketNFT.getEventCount()).to.equal(2n);
+    });
+
     it("rejects event creation by an unauthorized account", async function () {
       const { ticketNFT, user } = await deployTicketNFT();
 
       await expect(ticketNFT.connect(user).createEvent("Unauthorized Event")).to
         .be.revertedWith("Not authorized organizer");
+    });
+
+    it("rejects event creation with an empty name", async function () {
+      const { ticketNFT, owner } = await deployTicketNFT();
+
+      await expect(ticketNFT.connect(owner).createEvent("")).to.be.revertedWith(
+        "Event name required"
+      );
     });
 
     it("allows the event organizer to create a category", async function () {
@@ -114,6 +132,35 @@ describe("TicketNFT", function () {
           .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 10)
       ).to.be.revertedWith("Not event organizer");
     });
+
+    it("rejects category creation with missing ticket metadata setup", async function () {
+      const { ticketNFT, organizer } = await createEventWithCategory();
+
+      await expect(
+        ticketNFT.connect(organizer).createCategory(0, "", "ipfs://vip-ticket", 100, 10)
+      ).to.be.revertedWith("Ticket type required");
+
+      await expect(
+        ticketNFT.connect(organizer).createCategory(0, "VIP", "", 100, 10)
+      ).to.be.revertedWith("Metadata URI required");
+
+      await expect(
+        ticketNFT.connect(organizer).createCategory(0, "VIP", "ipfs://vip-ticket", 100, 0)
+      ).to.be.revertedWith("Max supply must be greater than zero");
+    });
+
+    it("allows only the event manager to change event active status", async function () {
+      const { ticketNFT, organizer, user } = await createEventWithCategory();
+
+      await expect(ticketNFT.connect(user).setEventActive(0, false)).to.be.revertedWith(
+        "Not event organizer"
+      );
+
+      await ticketNFT.connect(organizer).setEventActive(0, false);
+
+      const eventInfo = await ticketNFT.getEventInfo(0);
+      expect(eventInfo[2]).to.equal(false);
+    });
   });
 
   describe("purchase and inventory", function () {
@@ -144,6 +191,15 @@ describe("TicketNFT", function () {
 
       expect(categoryInfo[4]).to.equal(1n);
       expect(categoryInfo[5]).to.equal(1n);
+    });
+
+    it("tracks the total number of minted tickets across purchases", async function () {
+      const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
+
+      await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
+      await ticketNFT.connect(otherUser).purchaseTicket(0, 0, { value: price });
+
+      expect(await ticketNFT.getTotalMintedTickets()).to.equal(2n);
     });
 
     it("rejects purchases with incorrect payment", async function () {
@@ -270,6 +326,14 @@ describe("TicketNFT", function () {
   });
 
   describe("existing invariants and legacy helper behavior", function () {
+    it("rejects setting the organizer role for the zero address", async function () {
+      const { ticketNFT, owner } = await deployTicketNFT();
+
+      await expect(
+        ticketNFT.connect(owner).setOrganizer("0x0000000000000000000000000000000000000000", true)
+      ).to.be.revertedWith("Invalid organizer");
+    });
+
     it("rejects getTicketInfo for a nonexistent token", async function () {
       const { ticketNFT } = await deployTicketNFT();
 

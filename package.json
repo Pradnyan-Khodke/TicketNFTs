@@ -9,8 +9,11 @@
   },
   "scripts": {
     "build": "hardhat build",
+    "node": "hardhat node",
     "test": "hardhat test",
-    "deploy:local": "hardhat run scripts/deploy.ts --network localhost"
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "metadata:category": "HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts",
+    "metadata:category:dry-run": "HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts --dry-run"
   },
   "repository": {
     "type": "git",
@@ -47,6 +50,7 @@
   },
   "type": "module",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "@openzeppelin/contracts": "^5.6.1"
   }
 }

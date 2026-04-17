@@ -1,119 +1,185 @@
 # TicketNFTs
 
-TicketNFTs is a CS 521 course project exploring ERC-721 ticket NFTs and programmable digital ownership. The current repo demonstrates a simple ticket lifecycle on Ethereum-style infrastructure: mint a ticket, inspect its metadata, transfer it before use, redeem it once, and prevent transfers after redemption.
+ERC-721 ticketing app with event inventory, purchases, IPFS-backed metadata, redemption, and transfer restrictions after redemption.
 
-## Project Overview
+## Overview
 
-This project treats a ticket as more than a collectible NFT. The goal is to explore which ticketing rules can be enforced directly by a smart contract, and where a real-world system would still need off-chain coordination.
+Architecture:
 
-The current codebase is a working local demo, not a full ticketing platform. It focuses on one contract, one deployment script, and one small frontend that proves the contract behavior end to end.
+- one contract
+- one React frontend
+- one deployment script
+- one metadata/IPFS script
+- no backend
 
-## Current Architecture
+## Architecture
 
 - `contracts/TicketNFT.sol`
-  - ERC-721 ticket contract built with OpenZeppelin
-  - stores token URI, `eventId`, and `ticketType`
-  - owner-only minting
-  - one-time redemption by the current owner
+  - ERC-721 ticket contract
+  - event and category inventory
+  - purchases mint tickets automatically
+  - one-time redemption
   - transfers blocked after redemption
+  - one category-level `metadataURI` stored on-chain per category
 - `scripts/deploy.ts`
-  - deploys the contract
-  - writes the contract address and chain ID into `frontend/.env.local`
+  - deploys the contract locally
+  - writes contract address and chain ID into `frontend/.env.local`
+- `scripts/createCategoryWithMetadata.ts`
+  - generates category metadata
+  - optionally generates/uploads a ticket image
+  - uploads metadata to IPFS
+  - creates the category on-chain with the resulting `ipfs://...` URI
 - `frontend/`
-  - React + TypeScript + Vite demo app
-  - uses MetaMask and `ethers` to mint, inspect, redeem, and transfer tickets
+  - React + TypeScript + Vite app
+  - event browsing, purchasing, owned-ticket views, organizer tools
+  - organizer command builder for metadata/category creation
+  - resolves `ipfs://...` metadata and image assets through an HTTP gateway
 - `test/TicketNFT.test.ts`
-  - Hardhat test suite for the current contract behavior
-- `docs/design.md`
-  - concise project/design snapshot
+  - Hardhat tests for event creation, category setup, purchase flow, and ticket lifecycle rules
 
-## Repository Structure
+## On-Chain vs Off-Chain Data
 
-- `contracts/` Solidity smart contracts
-- `scripts/` deployment helpers
-- `test/` contract tests
-- `frontend/` demo UI
-- `docs/` design notes
+### On-chain
 
-## Current Feature List
+- event records
+- category inventory
+- price
+- max supply
+- minted count
+- ownership
+- `eventId`
+- `categoryId`
+- `ticketType`
+- redemption state
+- transfer restrictions after redemption
+- category-level `metadataURI`
 
-- ERC-721 ticket minting
-- on-chain storage of ticket URI, event ID, and ticket type
-- owner lookup and ticket info retrieval
-- one-time ticket redemption
-- transfers before redemption
-- transfer rejection after redemption
-- local frontend demo for wallet-based interaction
+### Off-chain on IPFS
 
-## Local Setup
+- NFT display name
+- description
+- image asset or placeholder SVG
+- descriptive event/category fields for display
 
-Install dependencies:
+## Category-Level Metadata
+
+Metadata is category-level, not per-ticket:
+
+- each category stores one `metadataURI` on-chain
+- all tickets purchased from that category share the same metadata JSON
+- this is intentional
+- it fits the current mint/purchase flow
+- it avoids a backend
+
+## Local Env Setup
+
+Two local env files are used:
+
+### Root `.env`
+
+Used for local script/backend-style secrets such as Pinata:
+
+```bash
+PINATA_JWT=your_pinata_jwt_here
+```
+
+This file is gitignored and loaded through `dotenv/config` in:
+
+- `hardhat.config.ts`
+- `scripts/createCategoryWithMetadata.ts`
+
+### `frontend/.env.local`
+
+Used only by the frontend for public connection values:
+
+- `VITE_TICKET_NFT_ADDRESS`
+- `VITE_TICKET_NFT_CHAIN_ID`
+
+This file is written automatically by the deploy script.
+
+## Package Scripts
+
+Root scripts:
+
+- `npm run node`
+  - starts the local Hardhat node
+- `npm run deploy:local`
+  - deploys the contract to localhost
+- `npm run metadata:category`
+  - runs the standalone metadata/category script against localhost
+- `npm run metadata:category:dry-run`
+  - runs the metadata/category script in dry-run mode
+- `npm test`
+  - runs the contract test suite
+
+## Why The Metadata Script Uses `HARDHAT_NETWORK=localhost node ...`
+
+Use the metadata script as a standalone Node script with Hardhat environment access:
+
+```bash
+HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
+```
+
+The package scripts wrap that pattern.
+
+## Local Run Flow
+
+1. Install dependencies:
 
 ```bash
 npm install
 cd frontend
 npm install
+cd ..
 ```
 
-## Local Run Flow
-
-1. Start a local Hardhat node from the repo root:
+2. Start the local chain:
 
 ```bash
-npx hardhat node
+npm run node
 ```
 
-2. In a second terminal, deploy the contract:
+3. Deploy the contract in another terminal:
 
 ```bash
 npm run deploy:local
 ```
 
-This writes `frontend/.env.local` with the deployed contract address and chain ID.
+4. Create categories with the metadata script:
 
-3. In a third terminal, start the frontend:
+Dry run:
+
+```bash
+npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
+```
+
+Live localhost run:
+
+```bash
+npm run metadata:category -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+```
+
+5. Start the frontend:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-4. In MetaMask:
-
-- add/connect the local Hardhat network
-- import one of the funded local accounts shown by `npx hardhat node`
-- use the deployer account when you want to mint
-
-## Testing
-
-Run the contract test suite from the repo root:
-
-```bash
-npm test
-```
-
 ## Demo Flow
 
-1. Connect the deployer wallet in the frontend.
-2. Mint a ticket to yourself or another local address.
-3. Inspect the ticket data and ownership.
-4. Transfer the ticket before redemption if you want to test ownership change.
-5. Redeem the ticket as the current owner.
-6. Confirm that later transfers fail.
+1. Connect MetaMask to the local Hardhat network.
+2. Use an organizer/admin wallet to create an event.
+3. Open the Organizer view, fill in the ticket category fields, and use the generated metadata script command.
+4. Run the metadata/IPFS script to upload assets and create the category on-chain.
+5. Purchase a ticket from the `Events` view.
+6. Open `My Tickets` to inspect metadata name, description, image, and token URI.
+7. Redeem the ticket and confirm it cannot be transferred afterward.
 
 ## Known Limitations
 
-- The repo currently has one contract, not a full marketplace system.
-- Minting is centralized to the contract owner.
-- Ticket metadata is stored as a URI plus a few simple fields; there is no metadata upload pipeline in the repo.
-- The frontend is a local demo/control panel, not a production-ready ticket marketplace.
-- The main documented workflow is local development; Sepolia configuration exists but is not the primary demo path.
-
-## Next Steps
-
-Clearly labeled future work:
-
-- explore resale or marketplace logic if it is still in scope for the project
-- improve metadata handling and presentation
-- expand the frontend beyond the current operator-style demo
-- add broader integration coverage as the project grows
+- One contract only. No marketplace or resale system.
+- Metadata is category-level rather than unique per issued ticket.
+- IPFS display depends on HTTP gateway access.
+- Category creation is script-driven. The Organizer view generates commands but does not upload directly.
+- Local-first workflow.

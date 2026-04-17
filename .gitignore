@@ -15,6 +15,7 @@
 
 # Coverage
 /coverage
+/scripts/generated-metadata
 
 # Environment files
 .env

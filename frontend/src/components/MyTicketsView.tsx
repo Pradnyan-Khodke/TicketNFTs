@@ -31,19 +31,15 @@ export function MyTicketsView({
         <div className="section-header">
           <div>
             <p className="eyebrow">My Tickets</p>
-            <h2>Your connected wallet inventory</h2>
+            <h2>Your tickets</h2>
           </div>
-          <p className="support-copy">
-            Redeem tickets when used and transfer them while they are still
-            valid.
-          </p>
+          <p className="support-copy">Redeem or transfer active tickets.</p>
         </div>
 
         {tickets.length === 0 ? (
           <div className="empty-inline">
             <p>
-              This wallet does not own any tickets yet. Purchase one from the
-              Events view to see it here.
+              This wallet does not own any tickets yet.
             </p>
           </div>
         ) : (
@@ -53,7 +49,7 @@ export function MyTicketsView({
                 <div className="event-card-header">
                   <div>
                     <p className="card-kicker">Token #{ticket.tokenId}</p>
-                    <h3>{ticket.eventName}</h3>
+                    <h3>{ticket.metadataName ?? ticket.eventName}</h3>
                   </div>
                   <span
                     className={`pill ${ticket.redeemed ? "neutral" : "success"}`}
@@ -61,6 +57,32 @@ export function MyTicketsView({
                     {getStatusLabel(ticket)}
                   </span>
                 </div>
+
+                {ticket.imageUrl ? (
+                  <div className="ticket-media">
+                    <img
+                      alt={ticket.metadataName ?? `${ticket.ticketType} ticket`}
+                      className="ticket-image"
+                      src={ticket.imageUrl}
+                    />
+                  </div>
+                ) : ticket.metadataStatus === "loaded" ? (
+                  <div className="ticket-media ticket-fallback">
+                    <p className="detail-label">Image unavailable</p>
+                    <p className="support-copy">No image found in metadata.</p>
+                  </div>
+                ) : ticket.metadataStatus === "error" ? (
+                  <div className="ticket-media ticket-fallback">
+                    <p className="detail-label">Metadata unavailable</p>
+                    <p className="support-copy">Could not load metadata from the gateway.</p>
+                  </div>
+                ) : null}
+
+                {ticket.metadataDescription ? (
+                  <p className="support-copy">{ticket.metadataDescription}</p>
+                ) : ticket.metadataStatus === "loaded" ? (
+                  <p className="support-copy">No description provided.</p>
+                ) : null}
 
                 <div className="ticket-details">
                   <div>
@@ -83,6 +105,12 @@ export function MyTicketsView({
                     <p className="detail-label">Token URI</p>
                     <p className="detail-value wrap">{ticket.tokenURI}</p>
                   </div>
+                  {ticket.metadataUrl ? (
+                    <div className="ticket-uri">
+                      <p className="detail-label">Resolved metadata</p>
+                      <p className="detail-value wrap">{ticket.metadataUrl}</p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="ticket-actions">

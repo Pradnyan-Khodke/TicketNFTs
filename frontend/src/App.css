@@ -236,6 +236,29 @@
   gap: 20px;
 }
 
+.hint-panel {
+  display: grid;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(111, 88, 176, 0.14);
+  background: linear-gradient(180deg, rgba(250, 247, 255, 0.96), rgba(242, 245, 252, 0.94));
+}
+
+.command-block {
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(111, 88, 176, 0.12);
+  background: rgba(33, 27, 51, 0.94);
+  color: #f7f1ff;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .wallet-header,
 .section-header,
 .event-card-header {
@@ -348,6 +371,34 @@
   text-align: left;
   color: inherit;
   box-shadow: 0 12px 28px rgba(22, 38, 56, 0.07);
+}
+
+.category-preview,
+.ticket-media {
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(94, 76, 148, 0.12);
+  background: linear-gradient(180deg, rgba(248, 245, 255, 0.92), rgba(239, 242, 250, 0.92));
+}
+
+.category-preview {
+  min-height: 168px;
+}
+
+.category-preview-image,
+.ticket-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.91 / 1;
+  object-fit: cover;
+}
+
+.category-preview-fallback,
+.ticket-fallback {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 18px;
 }
 
 .event-card.selected,

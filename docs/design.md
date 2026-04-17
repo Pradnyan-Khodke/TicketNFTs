@@ -1,75 +1,81 @@
 # TicketNFTs Design Notes
 
-## Project Goal
+## Goal
 
-TicketNFTs is a CS 521 project about ERC-721 ticket NFTs and programmable digital ownership. The core question is how much ticket behavior can be enforced directly on-chain instead of being handled only by a centralized ticketing platform.
+Decide which parts of ticket ownership belong on-chain and which can stay off-chain.
 
-## Current Design Snapshot
+## Snapshot
 
-The current repository centers on a single ERC-721 contract and a small frontend demo that exercises the contract locally.
+Main pieces:
 
-### On-chain model
+- a single ERC-721 ticket contract
+- event/category inventory on-chain
+- a local-first frontend for event browsing and ticket management
+- a lightweight script-based IPFS metadata workflow
 
-- each ticket is an ERC-721 token
-- each token stores:
-  - a metadata URI
-  - an `eventId`
-  - a `ticketType`
-- only the contract owner can mint tickets
-- the current ticket owner can redeem a ticket exactly once
-- redeemed tickets become non-transferable
+## On-Chain Model
 
-This gives the project a concrete ownership lifecycle:
+Stored and enforced on-chain:
 
-1. mint a ticket
-2. transfer it if needed
-3. redeem it once
-4. block any later transfer
+- event records
+- ticket categories per event
+- category price, max supply, and minted count
+- ticket ownership
+- ticket `eventId` and `ticketType`
+- redemption state
+- non-transferability after redemption
+- one category-level `metadataURI` per ticket category
 
-## Current Architecture
+## Off-Chain Metadata
 
-### Smart contract layer
+Metadata is category-level, not per-ticket:
 
-- [`contracts/TicketNFT.sol`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/contracts/TicketNFT.sol) implements the token, redemption state, and transfer restriction.
-- OpenZeppelin `ERC721` and `Ownable` provide the base token and admin model.
+- each category stores one metadata URI on-chain
+- all tickets purchased from that category share the same metadata JSON
+- metadata JSON can include:
+  - human-readable name
+  - description
+  - ticket image or placeholder SVG
+  - descriptive event/category fields
 
-### Deployment layer
+This keeps the contract simple and avoids a backend.
 
-- [`scripts/deploy.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/deploy.ts) deploys the contract and writes the contract address plus chain ID into `frontend/.env.local`.
+## Architecture
+
+### Contract layer
+
+- [`contracts/TicketNFT.sol`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/contracts/TicketNFT.sol) handles events, ticket categories, purchases, ownership, redemption, and transfer restrictions.
+
+### Script layer
+
+- [`scripts/deploy.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/deploy.ts) deploys the contract and writes frontend connection values into `frontend/.env.local`.
+- [`scripts/createCategoryWithMetadata.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/createCategoryWithMetadata.ts) generates category metadata, optionally generates/uploads an image, uploads metadata to IPFS, and creates the category on-chain with the resulting `ipfs://...` URI.
 
 ### Frontend layer
 
-- The React/Vite app in [`frontend/`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend) connects through MetaMask and demonstrates the contract flow end to end.
-- The current UI is intentionally simple and aimed at development/demo use, not production ticket sales.
+- [`frontend/`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend) supports:
+  - event browsing
+  - purchasing
+  - owned-ticket views
+  - metadata/image display from IPFS
+  - organizer/admin event setup
+  - command generation for metadata-backed category creation
 
-### Test layer
+## Env
 
-- [`test/TicketNFT.test.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/test/TicketNFT.test.ts) covers minting, metadata storage, redemption, ownership checks, transfers before redemption, and transfer rejection after redemption.
+- root `.env`
+  - local secrets such as `PINATA_JWT`
+  - loaded through `dotenv/config` in Hardhat config and the metadata script
+- `frontend/.env.local`
+  - public frontend connection values such as deployed contract address and chain ID
 
-## What The Current Repo Demonstrates
+## Metadata Script Invocation
 
-- NFT tickets can carry ticket-specific metadata on-chain.
-- Redemption can be enforced as a one-time state transition.
-- Ownership and redemption state can affect transferability.
-- A lightweight frontend can drive the full local demo flow without a separate backend.
+Use a standalone Node script with Hardhat runtime access instead of forwarding args through `hardhat run`.
 
-## What Is Not Implemented Yet
+## Remaining Limitations
 
-The current repo does not yet include:
-
-- a marketplace contract
-- resale pricing or resale-rule logic beyond "cannot transfer after redemption"
-- event creation/management workflows
-- batch minting
-- seat maps or structured venue data
-- an IPFS upload pipeline or hosted metadata service
-- frontend support for browsing many tickets/events
-
-## Future Work
-
-If the project continues past the current milestone, likely next steps are:
-
-- refine ticket transfer/resale policy
-- decide whether a separate marketplace contract is worth the added complexity
-- improve metadata handling and presentation
-- expand the frontend from a control panel into a clearer user demo
+- metadata is still shared across a category rather than unique per issued ticket
+- there is no separate indexing/backend layer
+- the frontend depends on HTTP gateway access to display IPFS-hosted metadata and images
+- organizer metadata/category creation is script-driven; the UI helps generate the command but does not upload directly

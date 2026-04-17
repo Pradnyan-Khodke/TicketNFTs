@@ -1,4 +1,3 @@
-import { parseEther } from "ethers";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   CONFIGURED_CONTRACT_ADDRESS,
@@ -33,13 +32,20 @@ const initialEventForm = {
 const initialCategoryForm = {
   eventId: "",
   maxSupply: "100",
-  metadataURI: "",
   priceEth: "0.01",
   ticketType: "VIP",
 };
 
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function shellQuote(value: string) {
+  if (value.length === 0) {
+    return "''";
+  }
+
+  return `'${value.replaceAll("'", `'\"'\"'`)}'`;
 }
 
 function getEventRemaining(event: EventRecord) {
@@ -74,6 +80,8 @@ function App() {
   const isBusy = busyLabel !== "";
   const selectedEvent =
     events.find((event) => event.eventId === selectedEventId) ?? null;
+  const selectedOrganizerEvent =
+    events.find((event) => event.eventId.toString() === categoryForm.eventId) ?? null;
 
   const metrics = useMemo(() => {
     const totalCategories = events.reduce(
@@ -92,6 +100,40 @@ function App() {
       totalInventoryRemaining,
     };
   }, [events, tickets]);
+
+  const metadataHint = useMemo(() => {
+    if (!selectedOrganizerEvent) {
+      return null;
+    }
+
+    const ticketType = categoryForm.ticketType.trim() || "VIP";
+    const priceEth = categoryForm.priceEth.trim() || "0.01";
+    const maxSupply = categoryForm.maxSupply.trim() || "100";
+    const baseCommand = [
+      "HARDHAT_NETWORK=localhost",
+      "node",
+      "scripts/createCategoryWithMetadata.ts",
+      "--event-id",
+      selectedOrganizerEvent.eventId.toString(),
+      "--ticket-type",
+      shellQuote(ticketType),
+      "--price-eth",
+      priceEth,
+      "--max-supply",
+      maxSupply,
+    ].join(" ");
+
+    return {
+      dryRun: `${baseCommand} --dry-run`,
+      eventName: selectedOrganizerEvent.name,
+      liveRun: `${baseCommand} --upload-image`,
+    };
+  }, [
+    categoryForm.maxSupply,
+    categoryForm.priceEth,
+    categoryForm.ticketType,
+    selectedOrganizerEvent,
+  ]);
 
   useEffect(() => {
     void syncWallet(false);
@@ -375,77 +417,6 @@ function App() {
     );
   }
 
-  async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const ticketType = categoryForm.ticketType.trim();
-    const metadataURI = categoryForm.metadataURI.trim();
-    const eventIdText = categoryForm.eventId.trim();
-    const maxSupplyText = categoryForm.maxSupply.trim();
-    const priceText = categoryForm.priceEth.trim();
-
-    if (!eventIdText) {
-      setNotice({
-        message: "Select an event before creating a ticket category.",
-        tone: "error",
-      });
-      return;
-    }
-
-    if (!ticketType || !metadataURI || !maxSupplyText || !priceText) {
-      setNotice({
-        message: "Complete all category fields before submitting.",
-        tone: "error",
-      });
-      return;
-    }
-
-    let eventId: number;
-    let maxSupply: bigint;
-    let price: bigint;
-
-    try {
-      eventId = Number(eventIdText);
-      maxSupply = BigInt(maxSupplyText);
-      price = parseEther(priceText);
-    } catch {
-      setNotice({
-        message: "Enter a valid event, supply, and ETH price.",
-        tone: "error",
-      });
-      return;
-    }
-
-    if (maxSupply <= 0n) {
-      setNotice({
-        message: "Ticket supply must be greater than zero.",
-        tone: "error",
-      });
-      return;
-    }
-
-    await runAction(
-      "Creating ticket category...",
-      "Ticket category created.",
-      async ({ contract }) => {
-        const tx = await contract.createCategory(
-          eventId,
-          ticketType,
-          metadataURI,
-          price,
-          maxSupply,
-        );
-        await tx.wait();
-        setCategoryForm((current) => ({
-          ...initialCategoryForm,
-          eventId: current.eventId,
-        }));
-        setSelectedEventId(eventId);
-        setActiveView("events");
-      },
-    );
-  }
-
   function setTransferTarget(tokenId: number, value: string) {
     setTransferTargets((current) => ({
       ...current,
@@ -459,14 +430,9 @@ function App() {
         <div className="hero-card">
           <p className="eyebrow">TicketNFTs</p>
           <h1 className="hero-title">TicketNFTs</h1>
-          <p className="hero-lead">
-            A student-built ticketing prototype for programmable digital
-            ownership.
-          </p>
+          <p className="hero-lead">ERC-721 ticketing prototype.</p>
           <p className="hero-copy">
-            Browse local events, purchase from inventory-backed ticket classes,
-            manage tickets in your wallet, and switch to organizer tools when
-            you need to set up a demo event.
+            Browse events, buy tickets, and manage them from your wallet.
           </p>
 
           <div className="metric-row">
@@ -497,8 +463,7 @@ function App() {
               <p className="eyebrow">Wallet</p>
               <h2>Wallet & Contract</h2>
               <p className="wallet-copy">
-                Useful connection details for the currently configured TicketNFT
-                deployment.
+                Current local connection details.
               </p>
             </div>
             <span className={`pill ${isOrganizer ? "success" : "neutral"}`}>
@@ -625,7 +590,7 @@ function App() {
           eventForm={eventForm}
           isBusy={isBusy}
           isOrganizer={isOrganizer}
-          onCategorySubmit={handleCreateCategory}
+          metadataHint={metadataHint}
           onCreateEvent={handleCreateEvent}
           setCategoryForm={setCategoryForm}
           setEventForm={setEventForm}

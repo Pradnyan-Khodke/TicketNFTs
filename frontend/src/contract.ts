@@ -12,6 +12,8 @@ const EXPECTED_CHAIN_ID = import.meta.env.VITE_TICKET_NFT_CHAIN_ID
   : undefined;
 
 export const CONFIGURED_CONTRACT_ADDRESS = CONTRACT_ADDRESS ?? "";
+export const DEFAULT_IPFS_GATEWAY =
+  "https://gateway.pinata.cloud/ipfs/";
 
 const ABI = [
   "function owner() view returns (address)",
@@ -53,7 +55,12 @@ export type WalletContext = {
 
 export type EventCategory = {
   categoryId: number;
+  imageUrl: string | null;
   maxSupply: bigint;
+  metadataDescription: string | null;
+  metadataName: string | null;
+  metadataStatus: "error" | "loaded" | "missing";
+  metadataUrl: string | null;
   metadataURI: string;
   minted: bigint;
   price: bigint;
@@ -75,12 +82,31 @@ export type TicketRecord = {
   eventActive: boolean;
   eventId: number;
   eventName: string;
+  imageUrl: string | null;
+  metadataDescription: string | null;
+  metadataName: string | null;
+  metadataStatus: "error" | "loaded" | "missing";
+  metadataUrl: string | null;
   organizer: string;
   owner: string;
   redeemed: boolean;
   ticketType: string;
   tokenId: number;
   tokenURI: string;
+};
+
+type NftMetadata = {
+  description?: string;
+  image?: string;
+  image_url?: string;
+  name?: string;
+};
+
+type ResolvedMetadata = {
+  imageUrl: string | null;
+  metadata: NftMetadata | null;
+  metadataUrl: string | null;
+  status: "error" | "loaded" | "missing";
 };
 
 function getEthereum() {
@@ -164,6 +190,7 @@ export async function getWalletContext(): Promise<WalletContext> {
 export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
   const eventCount = Number(await contract.getEventCount());
   const eventIds = Array.from({ length: eventCount }, (_, index) => index);
+  const metadataCache = new Map<string, Promise<ResolvedMetadata>>();
   const events = await Promise.all(
     eventIds.map(async (eventId) => {
       const [name, organizer, active, categoryCountRaw] =
@@ -177,10 +204,23 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
         categoryIds.map(async (categoryId) => {
           const [ticketType, metadataURI, price, maxSupply, minted, remaining] =
             await contract.getCategory(eventId, categoryId);
+          let metadataPromise = metadataCache.get(metadataURI);
+
+          if (!metadataPromise) {
+            metadataPromise = loadResolvedMetadata(metadataURI);
+            metadataCache.set(metadataURI, metadataPromise);
+          }
+
+          const resolved = await metadataPromise;
 
           return {
             categoryId,
+            imageUrl: resolved.imageUrl,
             maxSupply,
+            metadataDescription: resolved.metadata?.description ?? null,
+            metadataName: resolved.metadata?.name ?? null,
+            metadataStatus: resolved.status,
+            metadataUrl: resolved.metadataUrl,
             metadataURI,
             minted,
             price,
@@ -211,6 +251,7 @@ export async function loadOwnedTickets(
 ): Promise<TicketRecord[]> {
   const totalMinted = Number(await contract.getTotalMintedTickets());
   const eventCache = new Map(knownEvents.map((event) => [event.eventId, event]));
+  const metadataCache = new Map<string, Promise<ResolvedMetadata>>();
   const normalizedWallet = walletAddress.toLowerCase();
   const tickets: TicketRecord[] = [];
 
@@ -239,11 +280,23 @@ export async function loadOwnedTickets(
       }
     }
 
+    let metadataPromise = metadataCache.get(tokenURI);
+    if (!metadataPromise) {
+      metadataPromise = loadResolvedMetadata(tokenURI);
+      metadataCache.set(tokenURI, metadataPromise);
+    }
+    const resolved = await metadataPromise;
+
     tickets.push({
       categoryId: Number(categoryIdRaw),
       eventActive: eventRecord?.active ?? false,
       eventId,
       eventName: eventRecord?.name ?? `Event #${eventId}`,
+      imageUrl: resolved.imageUrl,
+      metadataDescription: resolved.metadata?.description ?? null,
+      metadataName: resolved.metadata?.name ?? null,
+      metadataStatus: resolved.status,
+      metadataUrl: resolved.metadataUrl,
       organizer: eventRecord?.organizer ?? "",
       owner,
       redeemed: ticketInfo[2],
@@ -267,6 +320,85 @@ export function formatPrice(value: bigint) {
 
 export function isValidWalletAddress(address: string) {
   return isAddress(address.trim());
+}
+
+export function resolveMetadataUrl(uri: string) {
+  const trimmed = uri.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith("ipfs://")) {
+    return `${DEFAULT_IPFS_GATEWAY}${trimmed.slice("ipfs://".length)}`;
+  }
+
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:")
+  ) {
+    return trimmed;
+  }
+
+  return trimmed;
+}
+
+export function resolveAssetUrl(uri: string) {
+  return resolveMetadataUrl(uri);
+}
+
+async function loadTokenMetadata(tokenURI: string): Promise<NftMetadata | null> {
+  const resolvedUrl = resolveMetadataUrl(tokenURI);
+
+  if (!resolvedUrl) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(resolvedUrl);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return (await response.json()) as NftMetadata;
+  } catch {
+    return null;
+  }
+}
+
+async function loadResolvedMetadata(tokenURI: string): Promise<ResolvedMetadata> {
+  const metadataUrl = resolveMetadataUrl(tokenURI);
+
+  if (!metadataUrl) {
+    return {
+      imageUrl: null,
+      metadata: null,
+      metadataUrl: null,
+      status: "missing",
+    };
+  }
+
+  const metadata = await loadTokenMetadata(tokenURI);
+
+  if (!metadata) {
+    return {
+      imageUrl: null,
+      metadata: null,
+      metadataUrl,
+      status: "error",
+    };
+  }
+
+  const metadataImageUri = metadata.image ?? metadata.image_url ?? null;
+
+  return {
+    imageUrl: metadataImageUri ? resolveAssetUrl(metadataImageUri) : null,
+    metadata,
+    metadataUrl,
+    status: "loaded",
+  };
 }
 
 export function formatError(error: unknown) {
