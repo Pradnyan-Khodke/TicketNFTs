@@ -1,42 +1,35 @@
 # Tests
 
-This directory contains Hardhat tests for the TicketNFTs smart contracts.
+This directory contains the Hardhat contract tests.
 
-## What Exists Today
+## Current Coverage
 
-- `TicketNFT.test.ts` is the current contract test suite.
-- The tests cover:
-  - owner-only minting
-  - token URI storage
-  - ticket metadata storage (`eventId`, `ticketType`)
-  - one-time redemption
-  - ownership checks for redemption
-  - transfers before redemption
-  - redemption after transfer by the new owner
-  - transfer rejection after redemption
-  - error handling for nonexistent token lookups
+- event creation
+- organizer permissions
+- category creation and validation
+- purchase success and failure cases
+- inventory tracking
+- ticket ownership after purchase
+- redemption rules
+- transfer before redemption
+- transfer blocked after redemption
+- legacy owner-only mint restriction
+- error handling for nonexistent tokens
 
-## Running The Tests
+Main suite:
+
+- `TicketNFT.test.ts`
+
+## Run
 
 From the repo root:
 
 ```bash
-npm install
 npm test
 ```
 
-## Current Scope
-
-These are contract-level tests. The repo does not currently include:
+## Not Covered
 
 - frontend UI tests
-- end-to-end browser tests
-- marketplace/resale contract tests
-
-## Future Work
-
-Likely next test additions if the project expands:
-
-- deployment script checks
-- frontend integration coverage
-- tests for any future resale or marketplace logic
+- browser end-to-end tests
+- deployment script tests

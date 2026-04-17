@@ -1,15 +1,18 @@
 :root {
-  font-family:
-    "IBM Plex Sans",
-    "Avenir Next",
-    "Segoe UI",
-    sans-serif;
+  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #231f3b;
-  background:
-    radial-gradient(circle at top left, rgba(160, 112, 255, 0.22), transparent 28%),
-    radial-gradient(circle at top right, rgba(255, 176, 221, 0.16), transparent 24%),
+  background: radial-gradient(
+      circle at top left,
+      rgba(160, 112, 255, 0.22),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(255, 176, 221, 0.16),
+      transparent 24%
+    ),
     linear-gradient(180deg, #fcf8ff 0%, #f3f1fb 54%, #edf1f8 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -52,10 +55,7 @@ p {
 h1,
 h2,
 h3 {
-  font-family:
-    "Space Grotesk",
-    "IBM Plex Sans",
-    sans-serif;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
   line-height: 1.05;
 }
 

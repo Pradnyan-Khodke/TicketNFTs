@@ -25,7 +25,7 @@ type OrganizerViewProps = {
   } | null;
   onCreateEvent: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   setCategoryForm: (
-    updater: (current: CategoryFormState) => CategoryFormState,
+    updater: (current: CategoryFormState) => CategoryFormState
   ) => void;
   setEventForm: (next: EventFormState) => void;
 };
@@ -56,12 +56,15 @@ export function OrganizerView({
           {!isOrganizer ? (
             <div className="empty-inline">
               <p>
-                This wallet is not approved to create events. Connect the contract
-                owner or an approved organizer account.
+                This wallet is not approved to create events. Connect the
+                contract owner or an approved organizer account.
               </p>
             </div>
           ) : (
-            <form className="form-card" onSubmit={(event) => void onCreateEvent(event)}>
+            <form
+              className="form-card"
+              onSubmit={(event) => void onCreateEvent(event)}
+            >
               <label htmlFor="event-name">Event name</label>
               <input
                 id="event-name"
@@ -86,7 +89,8 @@ export function OrganizerView({
               <h2>Define inventory and pricing</h2>
             </div>
             <p className="support-copy">
-              Set the ticket type, price, and supply, then run the generated command.
+              Set the ticket type, price, and supply, then run the generated
+              command.
             </p>
           </div>
 
@@ -185,13 +189,13 @@ export function OrganizerView({
             <div className="hint-panel">
               <p className="detail-label">Dry run</p>
               <pre className="command-block">{metadataHint.dryRun}</pre>
-              <p className="support-copy">
-                Generates files locally only.
-              </p>
+              <p className="support-copy">Generates files locally only.</p>
             </div>
 
             <div className="hint-panel">
-              <p className="detail-label">Upload image, upload metadata, and create category</p>
+              <p className="detail-label">
+                Upload image, upload metadata, and create category
+              </p>
               <pre className="command-block">{metadataHint.liveRun}</pre>
               <p className="support-copy">
                 Uploads metadata and creates the category.

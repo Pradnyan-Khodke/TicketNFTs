@@ -76,8 +76,9 @@ describe("TicketNFT", function () {
     it("rejects event creation by an unauthorized account", async function () {
       const { ticketNFT, user } = await deployTicketNFT();
 
-      await expect(ticketNFT.connect(user).createEvent("Unauthorized Event")).to
-        .be.revertedWith("Not authorized organizer");
+      await expect(
+        ticketNFT.connect(user).createEvent("Unauthorized Event")
+      ).to.be.revertedWith("Not authorized organizer");
     });
 
     it("rejects event creation with an empty name", async function () {
@@ -137,7 +138,9 @@ describe("TicketNFT", function () {
       const { ticketNFT, organizer } = await createEventWithCategory();
 
       await expect(
-        ticketNFT.connect(organizer).createCategory(0, "", "ipfs://vip-ticket", 100, 10)
+        ticketNFT
+          .connect(organizer)
+          .createCategory(0, "", "ipfs://vip-ticket", 100, 10)
       ).to.be.revertedWith("Ticket type required");
 
       await expect(
@@ -145,16 +148,18 @@ describe("TicketNFT", function () {
       ).to.be.revertedWith("Metadata URI required");
 
       await expect(
-        ticketNFT.connect(organizer).createCategory(0, "VIP", "ipfs://vip-ticket", 100, 0)
+        ticketNFT
+          .connect(organizer)
+          .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 0)
       ).to.be.revertedWith("Max supply must be greater than zero");
     });
 
     it("allows only the event manager to change event active status", async function () {
       const { ticketNFT, organizer, user } = await createEventWithCategory();
 
-      await expect(ticketNFT.connect(user).setEventActive(0, false)).to.be.revertedWith(
-        "Not event organizer"
-      );
+      await expect(
+        ticketNFT.connect(user).setEventActive(0, false)
+      ).to.be.revertedWith("Not event organizer");
 
       await ticketNFT.connect(organizer).setEventActive(0, false);
 
@@ -194,7 +199,8 @@ describe("TicketNFT", function () {
     });
 
     it("tracks the total number of minted tickets across purchases", async function () {
-      const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
+      const { ticketNFT, user, otherUser, price } =
+        await createEventWithCategory();
 
       await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
       await ticketNFT.connect(otherUser).purchaseTicket(0, 0, { value: price });
@@ -213,8 +219,9 @@ describe("TicketNFT", function () {
     it("rejects purchases for an invalid event", async function () {
       const { ticketNFT, user } = await deployTicketNFT();
 
-      await expect(ticketNFT.connect(user).purchaseTicket(999, 0)).to.be
-        .revertedWith("Event does not exist");
+      await expect(
+        ticketNFT.connect(user).purchaseTicket(999, 0)
+      ).to.be.revertedWith("Event does not exist");
     });
 
     it("rejects purchases for an invalid category", async function () {
@@ -226,7 +233,8 @@ describe("TicketNFT", function () {
     });
 
     it("rejects purchases once a category is sold out", async function () {
-      const { ticketNFT, user, otherUser, price } = await createEventWithCategory();
+      const { ticketNFT, user, otherUser, price } =
+        await createEventWithCategory();
 
       await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
       await ticketNFT.connect(otherUser).purchaseTicket(0, 0, { value: price });
@@ -237,7 +245,8 @@ describe("TicketNFT", function () {
     });
 
     it("blocks purchases when an event has been deactivated", async function () {
-      const { ticketNFT, organizer, user, price } = await createEventWithCategory();
+      const { ticketNFT, organizer, user, price } =
+        await createEventWithCategory();
 
       await ticketNFT.connect(organizer).setEventActive(0, false);
 
@@ -330,26 +339,26 @@ describe("TicketNFT", function () {
       const { ticketNFT, owner } = await deployTicketNFT();
 
       await expect(
-        ticketNFT.connect(owner).setOrganizer("0x0000000000000000000000000000000000000000", true)
+        ticketNFT
+          .connect(owner)
+          .setOrganizer("0x0000000000000000000000000000000000000000", true)
       ).to.be.revertedWith("Invalid organizer");
     });
 
     it("rejects getTicketInfo for a nonexistent token", async function () {
       const { ticketNFT } = await deployTicketNFT();
 
-      await expect(ticketNFT.getTicketInfo(999)).to.be.revertedWithCustomError(
-        ticketNFT,
-        "ERC721NonexistentToken"
-      ).withArgs(999);
+      await expect(ticketNFT.getTicketInfo(999))
+        .to.be.revertedWithCustomError(ticketNFT, "ERC721NonexistentToken")
+        .withArgs(999);
     });
 
     it("rejects tokenURI for a nonexistent token", async function () {
       const { ticketNFT } = await deployTicketNFT();
 
-      await expect(ticketNFT.tokenURI(999)).to.be.revertedWithCustomError(
-        ticketNFT,
-        "ERC721NonexistentToken"
-      ).withArgs(999);
+      await expect(ticketNFT.tokenURI(999))
+        .to.be.revertedWithCustomError(ticketNFT, "ERC721NonexistentToken")
+        .withArgs(999);
     });
 
     it("keeps the legacy owner-only manual mint helper restricted to the contract owner", async function () {
@@ -359,10 +368,9 @@ describe("TicketNFT", function () {
         ticketNFT
           .connect(user)
           .mintTicket(user.address, "ipfs://ticket-0", 1, "VIP")
-      ).to.be.revertedWithCustomError(
-        ticketNFT,
-        "OwnableUnauthorizedAccount"
-      ).withArgs(user.address);
+      )
+        .to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount")
+        .withArgs(user.address);
     });
   });
 });

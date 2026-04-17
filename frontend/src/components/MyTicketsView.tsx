@@ -38,9 +38,7 @@ export function MyTicketsView({
 
         {tickets.length === 0 ? (
           <div className="empty-inline">
-            <p>
-              This wallet does not own any tickets yet.
-            </p>
+            <p>This wallet does not own any tickets yet.</p>
           </div>
         ) : (
           <div className="ticket-grid">
@@ -52,7 +50,9 @@ export function MyTicketsView({
                     <h3>{ticket.metadataName ?? ticket.eventName}</h3>
                   </div>
                   <span
-                    className={`pill ${ticket.redeemed ? "neutral" : "success"}`}
+                    className={`pill ${
+                      ticket.redeemed ? "neutral" : "success"
+                    }`}
                   >
                     {getStatusLabel(ticket)}
                   </span>
@@ -74,7 +74,9 @@ export function MyTicketsView({
                 ) : ticket.metadataStatus === "error" ? (
                   <div className="ticket-media ticket-fallback">
                     <p className="detail-label">Metadata unavailable</p>
-                    <p className="support-copy">Could not load metadata from the gateway.</p>
+                    <p className="support-copy">
+                      Could not load metadata from the gateway.
+                    </p>
                   </div>
                 ) : null}
 
@@ -123,7 +125,9 @@ export function MyTicketsView({
                   </button>
 
                   <div className="transfer-form">
-                    <label htmlFor={`transfer-${ticket.tokenId}`}>Transfer to</label>
+                    <label htmlFor={`transfer-${ticket.tokenId}`}>
+                      Transfer to
+                    </label>
                     <input
                       id={`transfer-${ticket.tokenId}`}
                       onChange={(event) =>

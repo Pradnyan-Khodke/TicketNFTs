@@ -1,130 +1,64 @@
 # TicketNFTs
 
-ERC-721 ticketing app with event inventory, purchases, IPFS-backed metadata, redemption, and transfer restrictions after redemption.
+TicketNFTs is an ERC-721 ticketing project focused on programmable ownership. The contract issues tickets as NFTs, tracks event/category inventory, supports direct purchase and redemption, and blocks transfers after redemption. The frontend turns that flow into a small ticketing app for local and Sepolia demos.
 
-## Overview
+## Project Overview
 
-Architecture:
+Main idea:
 
-- one contract
-- one React frontend
-- one deployment script
-- one metadata/IPFS script
-- no backend
+- represent tickets as ERC-721 NFTs
+- keep ticket inventory on-chain by event and category
+- let users purchase tickets directly from available supply
+- use on-chain redemption state to enforce post-entry rules
+- keep metadata off-chain on IPFS without adding a backend
 
-## Architecture
+## Feature Summary
 
-- `contracts/TicketNFT.sol`
-  - ERC-721 ticket contract
-  - event and category inventory
-  - purchases mint tickets automatically
-  - one-time redemption
-  - transfers blocked after redemption
-  - one category-level `metadataURI` stored on-chain per category
-- `scripts/deploy.ts`
-  - deploys the contract locally
-  - writes contract address and chain ID into `frontend/.env.local`
-- `scripts/createCategoryWithMetadata.ts`
-  - generates category metadata
-  - optionally generates/uploads a ticket image
-  - uploads metadata to IPFS
-  - creates the category on-chain with the resulting `ipfs://...` URI
-- `frontend/`
-  - React + TypeScript + Vite app
-  - event browsing, purchasing, owned-ticket views, organizer tools
-  - organizer command builder for metadata/category creation
-  - resolves `ipfs://...` metadata and image assets through an HTTP gateway
-- `test/TicketNFT.test.ts`
-  - Hardhat tests for event creation, category setup, purchase flow, and ticket lifecycle rules
+Implemented:
 
-## On-Chain vs Off-Chain Data
+- organizer/admin event creation
+- per-event ticket categories with price, max supply, minted count, and remaining inventory
+- purchase flow that mints ERC-721 tickets automatically
+- ticket ownership, transfer, and redemption lifecycle
+- redeemed tickets cannot be transferred
+- category-level NFT metadata stored as `ipfs://...` URIs
+- React frontend for browsing events, purchasing, viewing owned tickets, redeeming, and transferring
+- local deployment flow
+- Sepolia deployment flow
 
-### On-chain
+## Architecture Summary
 
-- event records
-- category inventory
-- price
-- max supply
-- minted count
-- ownership
-- `eventId`
-- `categoryId`
-- `ticketType`
-- redemption state
-- transfer restrictions after redemption
-- category-level `metadataURI`
+- [`contracts/TicketNFT.sol`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/contracts/TicketNFT.sol)
+  - single ERC-721 contract
+  - stores events, categories, inventory, ticket references, and redemption state
+- [`frontend/`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend)
+  - React + Vite frontend
+  - connects through MetaMask
+  - resolves IPFS metadata through an HTTP gateway
+- [`scripts/deploy.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/deploy.ts)
+  - deploys to localhost or Sepolia
+  - writes the matching frontend env file
+- [`scripts/createCategoryWithMetadata.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/createCategoryWithMetadata.ts)
+  - generates metadata and optional image assets
+  - uploads to IPFS through Pinata
+  - creates the category on-chain
+- [`test/TicketNFT.test.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/test/TicketNFT.test.ts)
+  - contract-level test suite
 
-### Off-chain on IPFS
+## Metadata / IPFS Summary
 
-- NFT display name
-- description
-- image asset or placeholder SVG
-- descriptive event/category fields for display
-
-## Category-Level Metadata
-
-Metadata is category-level, not per-ticket:
+Metadata is category-level:
 
 - each category stores one `metadataURI` on-chain
-- all tickets purchased from that category share the same metadata JSON
-- this is intentional
-- it fits the current mint/purchase flow
-- it avoids a backend
+- all tickets in that category share the same metadata file
+- on-chain data covers ownership, event/category references, redemption state, and transfer rules
+- off-chain IPFS data covers display metadata such as name, description, and image
 
-## Local Env Setup
+This keeps the contract and frontend simple while still producing realistic NFT metadata.
 
-Two local env files are used:
+## Local Setup
 
-### Root `.env`
-
-Used for local script/backend-style secrets such as Pinata:
-
-```bash
-PINATA_JWT=your_pinata_jwt_here
-```
-
-This file is gitignored and loaded through `dotenv/config` in:
-
-- `hardhat.config.ts`
-- `scripts/createCategoryWithMetadata.ts`
-
-### `frontend/.env.local`
-
-Used only by the frontend for public connection values:
-
-- `VITE_TICKET_NFT_ADDRESS`
-- `VITE_TICKET_NFT_CHAIN_ID`
-
-This file is written automatically by the deploy script.
-
-## Package Scripts
-
-Root scripts:
-
-- `npm run node`
-  - starts the local Hardhat node
-- `npm run deploy:local`
-  - deploys the contract to localhost
-- `npm run metadata:category`
-  - runs the standalone metadata/category script against localhost
-- `npm run metadata:category:dry-run`
-  - runs the metadata/category script in dry-run mode
-- `npm test`
-  - runs the contract test suite
-
-## Why The Metadata Script Uses `HARDHAT_NETWORK=localhost node ...`
-
-Use the metadata script as a standalone Node script with Hardhat environment access:
-
-```bash
-HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
-```
-
-The package scripts wrap that pattern.
-
-## Local Run Flow
-
-1. Install dependencies:
+Install dependencies:
 
 ```bash
 npm install
@@ -133,53 +67,112 @@ npm install
 cd ..
 ```
 
-2. Start the local chain:
+Root `.env` is optional for localhost unless you want IPFS uploads:
+
+```bash
+PINATA_JWT=your_pinata_jwt_here
+```
+
+## Local Demo Flow
+
+1. Start the local node:
 
 ```bash
 npm run node
 ```
 
-3. Deploy the contract in another terminal:
+2. Deploy locally:
 
 ```bash
 npm run deploy:local
 ```
 
-4. Create categories with the metadata script:
+This writes [frontend/.env.local](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend/.env.local:1).
 
-Dry run:
-
-```bash
-npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
-```
-
-Live localhost run:
-
-```bash
-npm run metadata:category -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
-```
-
-5. Start the frontend:
+3. Start the frontend:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-## Demo Flow
+4. In MetaMask:
 
-1. Connect MetaMask to the local Hardhat network.
-2. Use an organizer/admin wallet to create an event.
-3. Open the Organizer view, fill in the ticket category fields, and use the generated metadata script command.
-4. Run the metadata/IPFS script to upload assets and create the category on-chain.
-5. Purchase a ticket from the `Events` view.
-6. Open `My Tickets` to inspect metadata name, description, image, and token URI.
-7. Redeem the ticket and confirm it cannot be transferred afterward.
+- switch to the local Hardhat network
+- import a funded local account if needed
+- use the deployer/organizer account for event setup
 
-## Known Limitations
+5. Demo flow:
 
-- One contract only. No marketplace or resale system.
-- Metadata is category-level rather than unique per issued ticket.
-- IPFS display depends on HTTP gateway access.
-- Category creation is script-driven. The Organizer view generates commands but does not upload directly.
-- Local-first workflow.
+- create an event in the Organizer view
+- generate a category command in the Organizer view
+- run the metadata script
+- purchase a ticket in Events
+- inspect and redeem the ticket in My Tickets
+
+Local metadata commands:
+
+```bash
+npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
+npm run metadata:category -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+```
+
+## Sepolia Setup / Deploy Flow
+
+Set root `.env`:
+
+```bash
+SEPOLIA_RPC_URL=your_sepolia_rpc_url
+SEPOLIA_PRIVATE_KEY=your_deployer_private_key
+PINATA_JWT=your_pinata_jwt_here
+```
+
+Deploy to Sepolia:
+
+```bash
+npm run deploy:sepolia
+```
+
+This writes [frontend/.env.sepolia.local](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend/.env.sepolia.local:1).
+
+Start the frontend against Sepolia:
+
+```bash
+cd frontend
+npm run dev:sepolia
+```
+
+Optional Sepolia metadata commands:
+
+```bash
+npm run metadata:category:sepolia:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
+npm run metadata:category:sepolia -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+```
+
+MetaMask notes:
+
+- switch MetaMask to Sepolia before connecting
+- the deployer/organizer wallet needs Sepolia ETH
+- localhost and Sepolia use different frontend env files
+
+## Current Limitations
+
+- one contract only; no resale or marketplace layer
+- metadata is category-level rather than per-ticket
+- metadata/category creation is script-driven
+- frontend display depends on IPFS gateway availability
+- event discovery is intentionally minimal and on-chain only
+
+## Future Work
+
+- per-ticket metadata if a stronger uniqueness model is needed
+- resale/transfer policy extensions
+- richer event fields such as time, venue, or organizer metadata
+- verification or indexer support for public deployments
+
+## Repo Notes
+
+Recommended cleanup:
+
+- remove `frontend/.env.undefined.local` if it still exists from the earlier deploy-script bug
+- keep `.env`, `frontend/.env.local`, and `frontend/.env.sepolia.local` out of version control

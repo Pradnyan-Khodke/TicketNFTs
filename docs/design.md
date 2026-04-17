@@ -1,81 +1,99 @@
 # TicketNFTs Design Notes
 
-## Goal
+## Thesis
 
-Decide which parts of ticket ownership belong on-chain and which can stay off-chain.
+Treat a ticket as programmable digital ownership rather than a static pass. Ownership, purchase eligibility, redemption state, and transfer restrictions live on-chain. Display metadata and images stay off-chain.
 
-## Snapshot
+## Final Design
 
-Main pieces:
+- one ERC-721 contract
+- one frontend
+- one deploy script
+- one metadata/IPFS script
+- no backend
 
-- a single ERC-721 ticket contract
-- event/category inventory on-chain
-- a local-first frontend for event browsing and ticket management
-- a lightweight script-based IPFS metadata workflow
+## Contract Model
 
-## On-Chain Model
+The contract stores:
 
-Stored and enforced on-chain:
-
-- event records
-- ticket categories per event
-- category price, max supply, and minted count
-- ticket ownership
-- ticket `eventId` and `ticketType`
+- events
+- categories per event
+- category price
+- category max supply
+- category minted count
+- ticket `eventId`
+- ticket `categoryId`
+- ticket `ticketType`
 - redemption state
-- non-transferability after redemption
-- one category-level `metadataURI` per ticket category
 
-## Off-Chain Metadata
+Main flows:
 
-Metadata is category-level, not per-ticket:
+- organizer/admin creates an event
+- organizer/admin defines one or more ticket categories
+- buyer purchases from a category with remaining supply
+- purchase mints the NFT directly to the buyer
+- owner can redeem once
+- redeemed tickets cannot be transferred
 
-- each category stores one metadata URI on-chain
-- all tickets purchased from that category share the same metadata JSON
-- metadata JSON can include:
-  - human-readable name
-  - description
-  - ticket image or placeholder SVG
-  - descriptive event/category fields
+## Metadata Model
 
-This keeps the contract simple and avoids a backend.
+Metadata is category-level:
 
-## Architecture
+- each category stores one `metadataURI`
+- tickets in the same category share the same metadata file
 
-### Contract layer
+On-chain:
 
-- [`contracts/TicketNFT.sol`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/contracts/TicketNFT.sol) handles events, ticket categories, purchases, ownership, redemption, and transfer restrictions.
+- ownership
+- event/category references
+- redemption state
+- transfer restrictions
+- category `metadataURI`
 
-### Script layer
+Off-chain on IPFS:
 
-- [`scripts/deploy.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/deploy.ts) deploys the contract and writes frontend connection values into `frontend/.env.local`.
-- [`scripts/createCategoryWithMetadata.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/createCategoryWithMetadata.ts) generates category metadata, optionally generates/uploads an image, uploads metadata to IPFS, and creates the category on-chain with the resulting `ipfs://...` URI.
+- name
+- description
+- image
+- display-friendly event/category fields
 
-### Frontend layer
+This keeps the project explainable and avoids a backend.
 
-- [`frontend/`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend) supports:
-  - event browsing
-  - purchasing
-  - owned-ticket views
-  - metadata/image display from IPFS
-  - organizer/admin event setup
-  - command generation for metadata-backed category creation
+## Frontend Model
 
-## Env
+The frontend provides:
 
-- root `.env`
-  - local secrets such as `PINATA_JWT`
-  - loaded through `dotenv/config` in Hardhat config and the metadata script
-- `frontend/.env.local`
-  - public frontend connection values such as deployed contract address and chain ID
+- Events view for browsing events and categories
+- purchase flow
+- My Tickets view for owned-ticket inspection, redemption, and transfer
+- Organizer view for event creation and category command generation
 
-## Metadata Script Invocation
+Category creation is script-driven. The frontend generates the correct metadata command instead of uploading directly.
 
-Use a standalone Node script with Hardhat runtime access instead of forwarding args through `hardhat run`.
+## Deployment Model
 
-## Remaining Limitations
+Supported targets:
 
-- metadata is still shared across a category rather than unique per issued ticket
-- there is no separate indexing/backend layer
-- the frontend depends on HTTP gateway access to display IPFS-hosted metadata and images
-- organizer metadata/category creation is script-driven; the UI helps generate the command but does not upload directly
+- localhost
+- Sepolia
+
+Deployment writes frontend env files automatically:
+
+- `frontend/.env.local` for localhost
+- `frontend/.env.sepolia.local` for Sepolia
+
+## Tradeoffs
+
+Chosen:
+
+- one contract instead of multiple contracts
+- category-level metadata instead of per-ticket metadata
+- script-based IPFS uploads instead of a backend uploader
+- minimal event discovery without extra indexing
+
+Not implemented:
+
+- resale or marketplace logic
+- royalty logic
+- backend services
+- public indexing layer

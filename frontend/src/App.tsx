@@ -48,8 +48,19 @@ function shellQuote(value: string) {
   return `'${value.replaceAll("'", `'\"'\"'`)}'`;
 }
 
+function getMetadataNetworkName(chainId: string) {
+  if (chainId === "11155111") {
+    return "sepolia";
+  }
+
+  return "localhost";
+}
+
 function getEventRemaining(event: EventRecord) {
-  return event.categories.reduce((total, category) => total + category.remaining, 0n);
+  return event.categories.reduce(
+    (total, category) => total + category.remaining,
+    0n
+  );
 }
 
 function App() {
@@ -68,29 +79,30 @@ function App() {
   });
   const [ownerAddress, setOwnerAddress] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
-    null,
+    null
   );
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [tickets, setTickets] = useState<TicketRecord[]>([]);
-  const [transferTargets, setTransferTargets] = useState<Record<number, string>>(
-    {},
-  );
+  const [transferTargets, setTransferTargets] = useState<
+    Record<number, string>
+  >({});
   const [walletAddress, setWalletAddress] = useState("");
 
   const isBusy = busyLabel !== "";
   const selectedEvent =
     events.find((event) => event.eventId === selectedEventId) ?? null;
   const selectedOrganizerEvent =
-    events.find((event) => event.eventId.toString() === categoryForm.eventId) ?? null;
+    events.find((event) => event.eventId.toString() === categoryForm.eventId) ??
+    null;
 
   const metrics = useMemo(() => {
     const totalCategories = events.reduce(
       (count, event) => count + event.categories.length,
-      0,
+      0
     );
     const totalInventoryRemaining = events.reduce(
       (total, event) => total + getEventRemaining(event),
-      0n,
+      0n
     );
 
     return {
@@ -109,8 +121,9 @@ function App() {
     const ticketType = categoryForm.ticketType.trim() || "VIP";
     const priceEth = categoryForm.priceEth.trim() || "0.01";
     const maxSupply = categoryForm.maxSupply.trim() || "100";
+    const metadataNetworkName = getMetadataNetworkName(chainId);
     const baseCommand = [
-      "HARDHAT_NETWORK=localhost",
+      `HARDHAT_NETWORK=${metadataNetworkName}`,
       "node",
       "scripts/createCategoryWithMetadata.ts",
       "--event-id",
@@ -132,6 +145,7 @@ function App() {
     categoryForm.maxSupply,
     categoryForm.priceEth,
     categoryForm.ticketType,
+    chainId,
     selectedOrganizerEvent,
   ]);
 
@@ -171,7 +185,7 @@ function App() {
     if (
       selectedCategoryId === null ||
       !selectedEvent.categories.some(
-        (category) => category.categoryId === selectedCategoryId,
+        (category) => category.categoryId === selectedCategoryId
       )
     ) {
       setSelectedCategoryId(selectedEvent.categories[0].categoryId);
@@ -184,7 +198,7 @@ function App() {
     }
 
     const matchingEvent = events.find(
-      (event) => event.eventId.toString() === categoryForm.eventId,
+      (event) => event.eventId.toString() === categoryForm.eventId
     );
 
     if (!matchingEvent) {
@@ -225,7 +239,7 @@ function App() {
       const nextTickets = await loadOwnedTickets(
         context.contract,
         context.signerAddress,
-        nextEvents,
+        nextEvents
       );
 
       setWalletAddress(context.signerAddress);
@@ -270,7 +284,7 @@ function App() {
   async function runAction(
     pendingMessage: string,
     successMessage: string,
-    action: (context: WalletContext) => Promise<void>,
+    action: (context: WalletContext) => Promise<void>
   ) {
     setBusyLabel(pendingMessage);
     setNotice({
@@ -319,7 +333,7 @@ function App() {
   async function handlePurchase() {
     const selectedCategory =
       selectedEvent?.categories.find(
-        (category) => category.categoryId === selectedCategoryId,
+        (category) => category.categoryId === selectedCategoryId
       ) ?? null;
 
     if (!selectedEvent || !selectedCategory) {
@@ -337,10 +351,10 @@ function App() {
         const tx = await contract.purchaseTicket(
           selectedEvent.eventId,
           selectedCategory.categoryId,
-          { value: selectedCategory.price },
+          { value: selectedCategory.price }
         );
         await tx.wait();
-      },
+      }
     );
   }
 
@@ -351,7 +365,7 @@ function App() {
       async ({ contract }) => {
         const tx = await contract.redeem(tokenId);
         await tx.wait();
-      },
+      }
     );
   }
 
@@ -386,9 +400,13 @@ function App() {
       `Transferring ticket #${tokenId}...`,
       `Ticket #${tokenId} transferred.`,
       async ({ contract, signerAddress }) => {
-        const tx = await contract.transferFrom(signerAddress, recipient, tokenId);
+        const tx = await contract.transferFrom(
+          signerAddress,
+          recipient,
+          tokenId
+        );
         await tx.wait();
-      },
+      }
     );
   }
 
@@ -413,7 +431,7 @@ function App() {
         await tx.wait();
         setEventForm(initialEventForm);
         setActiveView("events");
-      },
+      }
     );
   }
 
@@ -462,9 +480,7 @@ function App() {
             <div>
               <p className="eyebrow">Wallet</p>
               <h2>Wallet & Contract</h2>
-              <p className="wallet-copy">
-                Current local connection details.
-              </p>
+              <p className="wallet-copy">Current local connection details.</p>
             </div>
             <span className={`pill ${isOrganizer ? "success" : "neutral"}`}>
               {isOrganizer ? "Organizer enabled" : "Buyer mode"}
@@ -475,7 +491,9 @@ function App() {
             <div>
               <p className="detail-label">Connected wallet</p>
               <p className="detail-value">
-                {walletAddress ? shortenAddress(walletAddress) : "Not connected"}
+                {walletAddress
+                  ? shortenAddress(walletAddress)
+                  : "Not connected"}
               </p>
             </div>
             <div>
@@ -503,7 +521,10 @@ function App() {
           </div>
 
           <div className="button-row">
-            <button onClick={() => void handleConnectWallet()} disabled={isBusy}>
+            <button
+              onClick={() => void handleConnectWallet()}
+              disabled={isBusy}
+            >
               Connect wallet
             </button>
             <button
@@ -539,7 +560,9 @@ function App() {
           My Tickets
         </button>
         <button
-          className={activeView === "organizer" ? "nav-pill active" : "nav-pill"}
+          className={
+            activeView === "organizer" ? "nav-pill active" : "nav-pill"
+          }
           onClick={() => setActiveView("organizer")}
           type="button"
         >

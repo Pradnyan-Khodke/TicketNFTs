@@ -1,26 +1,48 @@
 # Contracts
 
-This directory contains the Solidity smart contracts for TicketNFTs.
+This directory contains the Solidity contract for the project.
 
-## What Exists Today
+## Current Contract
 
-- `TicketNFT.sol` is the only contract currently in the repo.
-- It implements an ERC-721 ticket token using OpenZeppelin.
-- Each minted ticket stores:
-  - a token URI
-  - an `eventId`
-  - a `ticketType`
-- The contract owner is the only account allowed to mint.
-- The current token owner can redeem a ticket once.
-- A redeemed ticket cannot be transferred afterward.
+- `TicketNFT.sol`
+  - ERC-721 ticket contract
+  - organizer/admin event creation
+  - ticket categories with price and supply
+  - purchase flow that mints tickets automatically
+  - one-time redemption
+  - transfers blocked after redemption
 
-## Development Notes
+## Stored Data
 
-- The constructor takes an `initialOwner` address for the contract owner.
-- Token IDs are assigned sequentially starting from `0`.
-- Redemption status is tracked on-chain per token.
+Per event:
 
-## Basic Usage
+- name
+- organizer
+- active/inactive status
+- category count
+
+Per category:
+
+- ticket type
+- metadata URI
+- price
+- max supply
+- minted count
+
+Per ticket:
+
+- `eventId`
+- `categoryId`
+- `ticketType`
+- redemption state
+
+## Notes
+
+- one contract handles the full ticket flow
+- metadata is category-level
+- a legacy owner-only `mintTicket(...)` helper still exists, but the main flow is purchase-based
+
+## Usage
 
 Compile and test from the repo root:
 
@@ -29,17 +51,15 @@ npm install
 npm test
 ```
 
-To deploy locally:
+Deploy locally:
 
 ```bash
-npx hardhat node
+npm run node
 npm run deploy:local
 ```
 
-## Future Work
+Deploy to Sepolia:
 
-Possible future additions, not currently implemented:
-
-- separate marketplace/resale contracts
-- richer ticket metadata structures
-- batch minting or organizer-specific permissions
+```bash
+npm run deploy:sepolia
+```

@@ -92,9 +92,16 @@
 .hero-card {
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top right, rgba(150, 114, 255, 0.16), transparent 34%),
-    linear-gradient(145deg, rgba(253, 248, 255, 0.98), rgba(243, 244, 252, 0.97));
+  background: radial-gradient(
+      circle at top right,
+      rgba(150, 114, 255, 0.16),
+      transparent 34%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(253, 248, 255, 0.98),
+      rgba(243, 244, 252, 0.97)
+    );
 }
 
 .hero-card::before {
@@ -112,20 +119,26 @@
   inset: auto -20px -30px auto;
   width: 180px;
   height: 180px;
-  background:
-    repeating-linear-gradient(
-      135deg,
-      rgba(122, 63, 242, 0.08) 0 10px,
-      rgba(122, 63, 242, 0.02) 10px 20px
-    );
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(122, 63, 242, 0.08) 0 10px,
+    rgba(122, 63, 242, 0.02) 10px 20px
+  );
   border-radius: 36px;
   transform: rotate(10deg);
 }
 
 .wallet-card {
-  background:
-    radial-gradient(circle at top left, rgba(228, 220, 255, 0.74), transparent 38%),
-    linear-gradient(180deg, rgba(253, 249, 255, 0.98), rgba(245, 247, 254, 0.96));
+  background: radial-gradient(
+      circle at top left,
+      rgba(228, 220, 255, 0.74),
+      transparent 38%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(253, 249, 255, 0.98),
+      rgba(245, 247, 254, 0.96)
+    );
   position: relative;
   overflow: hidden;
 }
@@ -137,7 +150,11 @@
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(122, 63, 242, 0.11), rgba(255, 255, 255, 0));
+  background: linear-gradient(
+    135deg,
+    rgba(122, 63, 242, 0.11),
+    rgba(255, 255, 255, 0)
+  );
 }
 
 .hero-copy,
@@ -177,7 +194,11 @@
 
 .metric-card {
   padding: 18px 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(246, 241, 255, 0.72));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.78),
+    rgba(246, 241, 255, 0.72)
+  );
   border-color: rgba(109, 87, 168, 0.14);
 }
 
@@ -242,7 +263,11 @@
   padding: 18px 20px;
   border-radius: 22px;
   border: 1px solid rgba(111, 88, 176, 0.14);
-  background: linear-gradient(180deg, rgba(250, 247, 255, 0.96), rgba(242, 245, 252, 0.94));
+  background: linear-gradient(
+    180deg,
+    rgba(250, 247, 255, 0.96),
+    rgba(242, 245, 252, 0.94)
+  );
 }
 
 .command-block {
@@ -378,7 +403,11 @@
   overflow: hidden;
   border-radius: 22px;
   border: 1px solid rgba(94, 76, 148, 0.12);
-  background: linear-gradient(180deg, rgba(248, 245, 255, 0.92), rgba(239, 242, 250, 0.92));
+  background: linear-gradient(
+    180deg,
+    rgba(248, 245, 255, 0.92),
+    rgba(239, 242, 250, 0.92)
+  );
 }
 
 .category-preview {
@@ -598,7 +627,6 @@ button:disabled {
   .event-card-header {
     flex-direction: column;
   }
-
 }
 
 @media (max-width: 820px) {

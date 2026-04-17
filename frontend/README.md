@@ -1,43 +1,38 @@
 # Frontend
 
-React + TypeScript + Vite frontend for browsing events, purchasing tickets, managing owned tickets, and generating category setup commands.
+React + TypeScript + Vite app for the TicketNFTs demo.
 
 ## What It Does
 
-- `Events` view
-  - lists on-chain events
-  - shows ticket categories, prices, and remaining inventory
-  - shows category metadata preview images when available
-- `My Tickets` view
-  - shows tickets owned by the connected wallet
-  - resolves `ipfs://...` token metadata through an HTTP gateway
-  - displays metadata name, description, image, and resolved metadata URL
-  - supports redemption and transfer
-- `Organizer` view
-  - creates events
-  - lets organizers define category inputs and generate the correct metadata script command
+- `Events`
+  - list events and ticket categories
+  - show prices, supply, and remaining inventory
+  - purchase tickets
+- `My Tickets`
+  - show tickets owned by the connected wallet
+  - load metadata and images from IPFS
+  - redeem tickets
+  - transfer tickets when allowed
+- `Organizer`
+  - create events
+  - generate category metadata commands for local or Sepolia use
 
-## Env
-
-Uses its own env file:
+## Env Files
 
 - `frontend/.env.local`
-  - `VITE_TICKET_NFT_ADDRESS`
-  - `VITE_TICKET_NFT_CHAIN_ID`
+  - localhost contract address and chain ID
+- `frontend/.env.sepolia.local`
+  - Sepolia contract address and chain ID
 
-Written by the root deployment script. Separate from the root `.env` used for Pinata.
+These files are written by the root deploy script.
 
-## Metadata
+## Metadata Handling
 
-Uses the current category-level metadata design:
+- the frontend reads `tokenURI` and category metadata URIs
+- `ipfs://...` URIs are resolved through an HTTP gateway
+- fallback UI is shown if metadata or images cannot be loaded
 
-- each category stores one `metadataURI` on-chain
-- all tickets purchased from that category share that metadata file
-- metadata and image assets are fetched off-chain from IPFS through a gateway
-
-If metadata cannot be fetched, the UI shows a fallback state.
-
-## Local Run Instructions
+## Run Locally
 
 From the repo root:
 
@@ -45,38 +40,27 @@ From the repo root:
 npm install
 cd frontend
 npm install
-```
-
-Start the local chain from the repo root:
-
-```bash
+cd ..
 npm run node
-```
-
-Deploy the contract in a second terminal:
-
-```bash
 npm run deploy:local
-```
-
-Then start the frontend:
-
-```bash
 cd frontend
 npm run dev
 ```
 
-## Demo Flow
+## Run Against Sepolia
 
-1. Connect MetaMask to the local Hardhat network.
-2. Use an organizer/admin wallet to create an event.
-3. In the Organizer view, fill in the category fields and copy the generated metadata script command.
-4. Run the root metadata script to upload metadata/create the category on-chain.
-5. Purchase a ticket from the `Events` view.
-6. Open `My Tickets` to inspect metadata, image, token URI, redemption status, and transfer options.
+From the repo root:
+
+```bash
+npm run deploy:sepolia
+cd frontend
+npm run dev:sepolia
+```
+
+Use MetaMask on the matching network before connecting.
 
 ## Limitations
 
-- Metadata upload is still script-driven.
-- Metadata is category-level rather than unique per ticket.
-- The app resolves `ipfs://...` URIs through a gateway, so metadata/image display depends on gateway availability.
+- metadata/category creation is still script-driven
+- metadata is category-level, not per-ticket
+- IPFS display depends on gateway availability

@@ -12,8 +12,7 @@ const EXPECTED_CHAIN_ID = import.meta.env.VITE_TICKET_NFT_CHAIN_ID
   : undefined;
 
 export const CONFIGURED_CONTRACT_ADDRESS = CONTRACT_ADDRESS ?? "";
-export const DEFAULT_IPFS_GATEWAY =
-  "https://gateway.pinata.cloud/ipfs/";
+export const DEFAULT_IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
 const ABI = [
   "function owner() view returns (address)",
@@ -122,19 +121,64 @@ function getEthereum() {
 function getContractAddress() {
   if (!CONTRACT_ADDRESS) {
     throw new Error(
-      "Missing contract address. Run the local deploy script to generate frontend/.env.local."
+      "Missing contract address. Run the deploy script for the target network to generate the matching frontend env file."
     );
   }
 
   return CONTRACT_ADDRESS;
 }
 
+function toChainHex(chainId: bigint) {
+  return `0x${chainId.toString(16)}`;
+}
+
+async function ensureExpectedNetwork() {
+  if (EXPECTED_CHAIN_ID === undefined) {
+    return;
+  }
+
+  const ethereum = getEthereum();
+
+  try {
+    await ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: toChainHex(EXPECTED_CHAIN_ID) }],
+    });
+  } catch (error) {
+    const switchError = error as { code?: number };
+
+    if (switchError.code === 4902 && EXPECTED_CHAIN_ID === 31337n) {
+      await ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: "0x7a69",
+            chainName: "Hardhat Localhost",
+            nativeCurrency: {
+              name: "ETH",
+              symbol: "ETH",
+              decimals: 18,
+            },
+            rpcUrls: ["http://127.0.0.1:8545"],
+          },
+        ],
+      });
+      return;
+    }
+
+    throw error;
+  }
+}
+
 async function validateNetwork(provider: BrowserProvider) {
   const network = await provider.getNetwork();
 
-  if (EXPECTED_CHAIN_ID !== undefined && network.chainId !== EXPECTED_CHAIN_ID) {
+  if (
+    EXPECTED_CHAIN_ID !== undefined &&
+    network.chainId !== EXPECTED_CHAIN_ID
+  ) {
     throw new Error(
-      `Wrong network. Switch your wallet to chain ID ${EXPECTED_CHAIN_ID.toString()}.`
+      `Wrong network. Switch your wallet to chain ID ${EXPECTED_CHAIN_ID.toString()}. Current chain ID: ${network.chainId.toString()}.`
     );
   }
 
@@ -142,6 +186,7 @@ async function validateNetwork(provider: BrowserProvider) {
 }
 
 export async function connectWallet() {
+  await ensureExpectedNetwork();
   await getEthereum().request({ method: "eth_requestAccounts" });
 }
 
@@ -198,7 +243,7 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
       const categoryCount = Number(categoryCountRaw);
       const categoryIds = Array.from(
         { length: categoryCount },
-        (_, categoryId) => categoryId,
+        (_, categoryId) => categoryId
       );
       const categories = await Promise.all(
         categoryIds.map(async (categoryId) => {
@@ -227,7 +272,7 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
             remaining,
             ticketType,
           } satisfies EventCategory;
-        }),
+        })
       );
 
       return {
@@ -238,7 +283,7 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
         name,
         organizer,
       } satisfies EventRecord;
-    }),
+    })
   );
 
   return events.sort((left, right) => left.eventId - right.eventId);
@@ -247,10 +292,12 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
 export async function loadOwnedTickets(
   contract: Contract,
   walletAddress: string,
-  knownEvents: EventRecord[] = [],
+  knownEvents: EventRecord[] = []
 ): Promise<TicketRecord[]> {
   const totalMinted = Number(await contract.getTotalMintedTickets());
-  const eventCache = new Map(knownEvents.map((event) => [event.eventId, event]));
+  const eventCache = new Map(
+    knownEvents.map((event) => [event.eventId, event])
+  );
   const metadataCache = new Map<string, Promise<ResolvedMetadata>>();
   const normalizedWallet = walletAddress.toLowerCase();
   const tickets: TicketRecord[] = [];
@@ -273,7 +320,7 @@ export async function loadOwnedTickets(
 
     if (!eventRecord) {
       eventRecord = (await loadEvents(contract)).find(
-        (event) => event.eventId === eventId,
+        (event) => event.eventId === eventId
       );
       if (eventRecord) {
         eventCache.set(eventId, eventRecord);
@@ -348,7 +395,9 @@ export function resolveAssetUrl(uri: string) {
   return resolveMetadataUrl(uri);
 }
 
-async function loadTokenMetadata(tokenURI: string): Promise<NftMetadata | null> {
+async function loadTokenMetadata(
+  tokenURI: string
+): Promise<NftMetadata | null> {
   const resolvedUrl = resolveMetadataUrl(tokenURI);
 
   if (!resolvedUrl) {
@@ -368,7 +417,9 @@ async function loadTokenMetadata(tokenURI: string): Promise<NftMetadata | null> 
   }
 }
 
-async function loadResolvedMetadata(tokenURI: string): Promise<ResolvedMetadata> {
+async function loadResolvedMetadata(
+  tokenURI: string
+): Promise<ResolvedMetadata> {
   const metadataUrl = resolveMetadataUrl(tokenURI);
 
   if (!metadataUrl) {
@@ -423,7 +474,10 @@ export function formatError(error: unknown) {
 
     const normalized = message.toLowerCase();
 
-    if (normalized.includes("user rejected") || normalized.includes("user denied")) {
+    if (
+      normalized.includes("user rejected") ||
+      normalized.includes("user denied")
+    ) {
       return "Transaction was cancelled in MetaMask.";
     }
 

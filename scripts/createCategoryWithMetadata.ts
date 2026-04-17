@@ -8,7 +8,13 @@ import { parseArgs } from "node:util";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
-const frontendEnvLocalPath = path.join(repoRoot, "frontend", ".env.local");
+
+function getFrontendEnvPath(networkName: string) {
+  const fileName =
+    networkName === "localhost" ? ".env.local" : `.env.${networkName}.local`;
+
+  return path.join(repoRoot, "frontend", fileName);
+}
 
 type MetadataAttribute = {
   trait_type: string;
@@ -49,7 +55,7 @@ Optional:
   --description <string>    Custom metadata description
   --image-path <path>       Existing image to include instead of the generated SVG
   --upload-image            Upload the image asset to IPFS instead of embedding it
-  --contract <address>      Contract address override (otherwise frontend/.env.local is used)
+  --contract <address>      Contract address override (otherwise the matching frontend env file is used)
   --output-dir <path>       Local folder for generated files (default: scripts/generated-metadata)
   --dry-run                 Generate files only and skip IPFS upload + on-chain category creation
 
@@ -120,9 +126,13 @@ function createTicketSvg(args: {
   <text x="86" y="208" fill="#FFFFFF" font-family="'Space Grotesk', 'IBM Plex Sans', sans-serif" font-size="72" font-weight="700">${safeTicketType}</text>
   <text x="86" y="272" fill="rgba(255,255,255,0.88)" font-family="'IBM Plex Sans', sans-serif" font-size="34">${safeEventName}</text>
   <text x="86" y="376" fill="#E4D7FF" font-family="'IBM Plex Sans', sans-serif" font-size="22" letter-spacing="2">EVENT ID</text>
-  <text x="86" y="414" fill="#FFFFFF" font-family="'IBM Plex Sans', sans-serif" font-size="34" font-weight="700">${args.eventId}</text>
+  <text x="86" y="414" fill="#FFFFFF" font-family="'IBM Plex Sans', sans-serif" font-size="34" font-weight="700">${
+    args.eventId
+  }</text>
   <text x="330" y="376" fill="#E4D7FF" font-family="'IBM Plex Sans', sans-serif" font-size="22" letter-spacing="2">PRICE</text>
-  <text x="330" y="414" fill="#FFFFFF" font-family="'IBM Plex Sans', sans-serif" font-size="34" font-weight="700">${escapeXml(args.priceEth)} ETH</text>
+  <text x="330" y="414" fill="#FFFFFF" font-family="'IBM Plex Sans', sans-serif" font-size="34" font-weight="700">${escapeXml(
+    args.priceEth
+  )} ETH</text>
   <text x="580" y="376" fill="#E4D7FF" font-family="'IBM Plex Sans', sans-serif" font-size="22" letter-spacing="2">MAX SUPPLY</text>
   <text x="580" y="414" fill="#FFFFFF" font-family="'IBM Plex Sans', sans-serif" font-size="34" font-weight="700">${maxSupplyText}</text>
   <text x="86" y="526" fill="rgba(255,255,255,0.82)" font-family="'IBM Plex Sans', sans-serif" font-size="24">Programmable ticket ownership on ERC-721 infrastructure</text>
@@ -138,24 +148,23 @@ function escapeXml(value: string) {
     .replaceAll("'", "&apos;");
 }
 
-async function uploadJsonToPinata(
-  name: string,
-  payload: unknown,
-  jwt: string,
-) {
-  const response = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      pinataContent: payload,
-      pinataMetadata: {
-        name,
+async function uploadJsonToPinata(name: string, payload: unknown, jwt: string) {
+  const response = await fetch(
+    "https://api.pinata.cloud/pinning/pinJSONToIPFS",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        pinataContent: payload,
+        pinataMetadata: {
+          name,
+        },
+      }),
+    }
+  );
 
   const data = (await response.json()) as { IpfsHash?: string; error?: string };
 
@@ -173,7 +182,7 @@ async function uploadFileToPinata(
   fileName: string,
   contents: Buffer,
   contentType: string,
-  jwt: string,
+  jwt: string
 ) {
   const body = new FormData();
   body.append("file", new Blob([contents], { type: contentType }), fileName);
@@ -181,16 +190,19 @@ async function uploadFileToPinata(
     "pinataMetadata",
     JSON.stringify({
       name: fileName,
-    }),
+    })
   );
 
-  const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-    },
-    body,
-  });
+  const response = await fetch(
+    "https://api.pinata.cloud/pinning/pinFileToIPFS",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+      body,
+    }
+  );
 
   const data = (await response.json()) as { IpfsHash?: string; error?: string };
 
@@ -205,12 +217,17 @@ async function uploadFileToPinata(
 }
 
 async function readContractAddressFromFrontendEnv() {
-  const envContents = await readFile(frontendEnvLocalPath, "utf8");
+  const networkName = process.env.HARDHAT_NETWORK ?? "localhost";
+  const frontendEnvPath = getFrontendEnvPath(networkName);
+  const envContents = await readFile(frontendEnvPath, "utf8");
   const match = envContents.match(/^VITE_TICKET_NFT_ADDRESS=(.+)$/m);
 
   if (!match) {
     throw new Error(
-      "Could not find VITE_TICKET_NFT_ADDRESS in frontend/.env.local. Deploy locally first or pass --contract.",
+      `Could not find VITE_TICKET_NFT_ADDRESS in ${path.relative(
+        repoRoot,
+        frontendEnvPath
+      )}. Deploy first or pass --contract.`
     );
   }
 
@@ -262,7 +279,8 @@ function parseCliArgs(): ParsedOptions {
     eventId,
     imagePath: values["image-path"],
     maxSupply,
-    outputDir: values["output-dir"] ?? path.join("scripts", "generated-metadata"),
+    outputDir:
+      values["output-dir"] ?? path.join("scripts", "generated-metadata"),
     priceEth: values["price-eth"],
     ticketType: values["ticket-type"].trim(),
     uploadImage: values["upload-image"],
@@ -275,15 +293,22 @@ async function main() {
     options.contractAddress ?? (await readContractAddressFromFrontendEnv());
   const outputDir = path.resolve(repoRoot, options.outputDir);
 
-  const { ethers } = (await hre.network.connect()) as unknown as { ethers: any };
+  const { ethers } = (await hre.network.connect()) as unknown as {
+    ethers: any;
+  };
   const [signer] = await ethers.getSigners();
   const network = await ethers.provider.getNetwork();
-  const contract = await ethers.getContractAt("TicketNFT", contractAddress, signer);
-  const [eventName, organizer, active, categoryCountRaw] = await contract.getEventInfo(
-    options.eventId,
+  const contract = await ethers.getContractAt(
+    "TicketNFT",
+    contractAddress,
+    signer
   );
+  const [eventName, organizer, active, categoryCountRaw] =
+    await contract.getEventInfo(options.eventId);
   const categoryId = Number(categoryCountRaw);
-  const slug = slugify(`${eventName}-${options.ticketType}-event-${options.eventId}`);
+  const slug = slugify(
+    `${eventName}-${options.ticketType}-event-${options.eventId}`
+  );
   const fileBaseName = `${slug}-category-${categoryId}`;
   const priceWei = ethers.parseEther(options.priceEth);
 
@@ -307,7 +332,7 @@ async function main() {
         priceEth: options.priceEth,
         ticketType: options.ticketType,
       }),
-      "utf8",
+      "utf8"
     );
     imageContentType = "image/svg+xml";
     imageFileName = `${fileBaseName}.svg`;
@@ -317,14 +342,18 @@ async function main() {
   let imageReference = toDataUri(imageContents, imageContentType);
   const metadataDescription =
     options.description ??
-    `${options.ticketType} ticket for ${eventName}. This TicketNFT category tracks event ID ${options.eventId} with a max supply of ${options.maxSupply.toString()} tickets. Ownership, transfer restrictions after redemption, and redemption state are enforced on-chain.`;
+    `${
+      options.ticketType
+    } ticket for ${eventName}. This TicketNFT category tracks event ID ${
+      options.eventId
+    } with a max supply of ${options.maxSupply.toString()} tickets. Ownership, transfer restrictions after redemption, and redemption state are enforced on-chain.`;
 
   if (!options.dryRun) {
     const pinataJwt = process.env.PINATA_JWT?.trim();
 
     if (!pinataJwt) {
       throw new Error(
-        "PINATA_JWT is required for live IPFS upload. Use --dry-run to only generate files locally.",
+        "PINATA_JWT is required for live IPFS upload. Use --dry-run to only generate files locally."
       );
     }
 
@@ -333,7 +362,7 @@ async function main() {
         imageFileName,
         imageContents,
         imageContentType,
-        pinataJwt,
+        pinataJwt
       );
       imageReference = uploadedImage.uri;
       console.log("Uploaded image:", uploadedImage.uri);
@@ -359,12 +388,18 @@ async function main() {
   };
 
   const metadataPath = path.join(outputDir, `${fileBaseName}.json`);
-  await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
+  await writeFile(
+    metadataPath,
+    `${JSON.stringify(metadata, null, 2)}\n`,
+    "utf8"
+  );
 
   console.log("Generated metadata file:", metadataPath);
 
   if (options.dryRun) {
-    console.log("Dry run complete. No IPFS upload or on-chain transaction was sent.");
+    console.log(
+      "Dry run complete. No IPFS upload or on-chain transaction was sent."
+    );
     return;
   }
 
@@ -377,7 +412,7 @@ async function main() {
   const uploadedMetadata = await uploadJsonToPinata(
     `${fileBaseName}.json`,
     metadata,
-    pinataJwt,
+    pinataJwt
   );
 
   console.log("Uploaded metadata:", uploadedMetadata.uri);
@@ -388,14 +423,14 @@ async function main() {
     options.ticketType,
     uploadedMetadata.uri,
     priceWei,
-    options.maxSupply,
+    options.maxSupply
   );
   await tx.wait();
 
   console.log(`Created category #${categoryId} for event #${options.eventId}`);
   console.log("Stored tokenURI:", uploadedMetadata.uri);
   console.log(
-    "Future purchases in this category will mint tickets with that metadata URI.",
+    "Future purchases in this category will mint tickets with that metadata URI."
   );
 }
 

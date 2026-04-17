@@ -12,8 +12,11 @@
     "node": "hardhat node",
     "test": "hardhat test",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
     "metadata:category": "HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts",
-    "metadata:category:dry-run": "HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts --dry-run"
+    "metadata:category:dry-run": "HARDHAT_NETWORK=localhost node scripts/createCategoryWithMetadata.ts --dry-run",
+    "metadata:category:sepolia": "HARDHAT_NETWORK=sepolia node scripts/createCategoryWithMetadata.ts",
+    "metadata:category:sepolia:dry-run": "HARDHAT_NETWORK=sepolia node scripts/createCategoryWithMetadata.ts --dry-run"
   },
   "repository": {
     "type": "git",

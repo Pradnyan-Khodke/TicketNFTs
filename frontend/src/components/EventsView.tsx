@@ -16,7 +16,10 @@ function shortenAddress(address: string) {
 }
 
 function getEventRemaining(event: EventRecord) {
-  return event.categories.reduce((total, category) => total + category.remaining, 0n);
+  return event.categories.reduce(
+    (total, category) => total + category.remaining,
+    0n
+  );
 }
 
 function getStartingPrice(event: EventRecord) {
@@ -26,7 +29,7 @@ function getStartingPrice(event: EventRecord) {
 
   return event.categories.reduce(
     (lowest, category) => (category.price < lowest ? category.price : lowest),
-    event.categories[0].price,
+    event.categories[0].price
   );
 }
 
@@ -42,7 +45,7 @@ export function EventsView({
 }: EventsViewProps) {
   const selectedCategory =
     selectedEvent?.categories.find(
-      (category) => category.categoryId === selectedCategoryId,
+      (category) => category.categoryId === selectedCategoryId
     ) ?? null;
 
   return (
@@ -84,7 +87,9 @@ export function EventsView({
                         <h3>{event.name}</h3>
                       </div>
                       <span
-                        className={`pill ${event.active ? "success" : "neutral"}`}
+                        className={`pill ${
+                          event.active ? "success" : "neutral"
+                        }`}
                       >
                         {event.active ? "On sale" : "Inactive"}
                       </span>
@@ -115,7 +120,8 @@ export function EventsView({
                             className="category-chip"
                             key={`${event.eventId}-${category.categoryId}`}
                           >
-                            {category.ticketType} · {category.remaining.toString()}/
+                            {category.ticketType} ·{" "}
+                            {category.remaining.toString()}/
                             {category.maxSupply.toString()}
                           </span>
                         ))
@@ -139,7 +145,9 @@ export function EventsView({
                   <h2>{selectedEvent.name}</h2>
                 </div>
                 <span
-                  className={`pill ${selectedEvent.active ? "success" : "neutral"}`}
+                  className={`pill ${
+                    selectedEvent.active ? "success" : "neutral"
+                  }`}
                 >
                   {selectedEvent.active ? "Purchasing enabled" : "Inactive"}
                 </span>
@@ -152,7 +160,9 @@ export function EventsView({
                 </article>
                 <article className="detail-panel">
                   <p className="detail-label">Categories</p>
-                  <p className="detail-value">{selectedEvent.categories.length}</p>
+                  <p className="detail-value">
+                    {selectedEvent.categories.length}
+                  </p>
                 </article>
                 <article className="detail-panel">
                   <p className="detail-label">Inventory Remaining</p>
@@ -172,7 +182,9 @@ export function EventsView({
 
               <div className="section-subheader">
                 <h3>Choose a ticket category</h3>
-                <p className="support-copy">Purchase mints the NFT to your wallet.</p>
+                <p className="support-copy">
+                  Purchase mints the NFT to your wallet.
+                </p>
               </div>
 
               {selectedEvent.categories.length === 0 ? (
@@ -200,7 +212,9 @@ export function EventsView({
                           {category.imageUrl ? (
                             <div className="category-preview">
                               <img
-                                alt={category.metadataName ?? category.ticketType}
+                                alt={
+                                  category.metadataName ?? category.ticketType
+                                }
                                 className="category-preview-image"
                                 src={category.imageUrl}
                               />
@@ -225,14 +239,18 @@ export function EventsView({
                               <p className="card-kicker">
                                 Category #{category.categoryId}
                               </p>
-                              <h3>{category.metadataName ?? category.ticketType}</h3>
+                              <h3>
+                                {category.metadataName ?? category.ticketType}
+                              </h3>
                             </div>
                             <span
                               className={`pill ${
                                 category.remaining > 0n ? "success" : "neutral"
                               }`}
                             >
-                              {category.remaining > 0n ? "Available" : "Sold out"}
+                              {category.remaining > 0n
+                                ? "Available"
+                                : "Sold out"}
                             </span>
                           </div>
 
@@ -242,7 +260,9 @@ export function EventsView({
                               {category.minted.toString()}/
                               {category.maxSupply.toString()} sold
                             </span>
-                            <span>{category.remaining.toString()} remaining</span>
+                            <span>
+                              {category.remaining.toString()} remaining
+                            </span>
                           </div>
 
                           <p className="support-copy wrap">
@@ -260,7 +280,7 @@ export function EventsView({
                       <p className="detail-value">
                         {selectedCategory
                           ? `${selectedCategory.ticketType} · ${formatPrice(
-                              selectedCategory.price,
+                              selectedCategory.price
                             )}`
                           : "Choose a category"}
                       </p>
