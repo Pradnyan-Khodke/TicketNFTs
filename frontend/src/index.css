@@ -6,19 +6,22 @@
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #1f2d3d;
+  color: #231f3b;
   background:
-    radial-gradient(circle at top, rgba(255, 210, 166, 0.45), transparent 30%),
-    linear-gradient(180deg, #fff8ef 0%, #f3f7fb 58%, #eef3fa 100%);
+    radial-gradient(circle at top left, rgba(160, 112, 255, 0.22), transparent 28%),
+    radial-gradient(circle at top right, rgba(255, 176, 221, 0.16), transparent 24%),
+    linear-gradient(180deg, #fcf8ff 0%, #f3f1fb 54%, #edf1f8 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --accent: #ca5d26;
-  --border: rgba(32, 49, 85, 0.12);
-  --muted: #5f6c83;
-  --panel: rgba(255, 252, 246, 0.84);
-  --text: #1f2d3d;
+  --accent: #7a3ff2;
+  --accent-soft: #b18cff;
+  --accent-deep: #4d258f;
+  --border: rgba(74, 58, 116, 0.14);
+  --muted: #6b6685;
+  --panel: rgba(255, 252, 255, 0.86);
+  --text: #231f3b;
 }
 
 * {
@@ -41,12 +44,14 @@ body {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
 
 h1,
-h2 {
+h2,
+h3 {
   font-family:
     "Space Grotesk",
     "IBM Plex Sans",
@@ -64,6 +69,7 @@ h2 {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }

@@ -1,115 +1,97 @@
-import { useEffect, useState } from "react";
-import type { Log, LogDescription } from "ethers";
+import { parseEther } from "ethers";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
+  CONFIGURED_CONTRACT_ADDRESS,
   connectWallet,
+  formatError,
   getConnectedAccounts,
   getWalletContext,
+  isValidWalletAddress,
+  loadEvents,
+  loadOwnedTickets,
   subscribeWalletEvents,
+  type EventRecord,
+  type TicketRecord,
+  type WalletContext,
 } from "./contract";
 import "./App.css";
+import { EventsView } from "./components/EventsView";
+import { MyTicketsView } from "./components/MyTicketsView";
+import { OrganizerView } from "./components/OrganizerView";
 
-type TicketDetails = {
-  eventId: string;
-  owner: string;
-  redeemed: boolean;
-  ticketType: string;
-  tokenURI: string;
+type View = "events" | "tickets" | "organizer";
+
+type Notice = {
+  message: string;
+  tone: "error" | "info" | "success";
 };
 
-const initialMintForm = {
-  eventId: "1",
+const initialEventForm = {
+  name: "",
+};
+
+const initialCategoryForm = {
+  eventId: "",
+  maxSupply: "100",
+  metadataURI: "",
+  priceEth: "0.01",
   ticketType: "VIP",
-  to: "",
-  uri: "ipfs://demo-ticket",
 };
 
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function formatError(error: unknown) {
-  if (error && typeof error === "object") {
-    const maybeError = error as {
-      info?: { error?: { message?: string } };
-      data?: { message?: string };
-      error?: { message?: string };
-      reason?: string;
-      shortMessage?: string;
-      message?: string;
-      code?: number | string;
-    };
-
-    const message =
-      maybeError.shortMessage ??
-      maybeError.reason ??
-      maybeError.data?.message ??
-      maybeError.error?.message ??
-      maybeError.info?.error?.message ??
-      maybeError.message ??
-      "";
-
-    const normalized = message.toLowerCase();
-
-    if (normalized.includes("missing revert data")) {
-      return "Transaction was rejected by the contract. This usually happens when the action is not allowed, such as transferring a redeemed ticket.";
-    }
-
-    if (normalized.includes("redeemed ticket cannot be transferred")) {
-      return "Redeemed ticket cannot be transferred.";
-    }
-
-    if (normalized.includes("ticket already redeemed")) {
-      return "Ticket has already been redeemed.";
-    }
-
-    if (normalized.includes("not ticket owner")) {
-      return "Only the current ticket owner can perform this action.";
-    }
-
-    if (
-      normalized.includes("user rejected") ||
-      normalized.includes("user denied")
-    ) {
-      return "Transaction was cancelled in MetaMask.";
-    }
-
-    if (normalized.includes("wrong network")) {
-      return message;
-    }
-
-    if (
-      normalized.includes("owner-only") ||
-      normalized.includes("minting is owner-only")
-    ) {
-      return message;
-    }
-
-    return message || "Something went wrong.";
-  }
-
-  return "Something went wrong.";
+function getEventRemaining(event: EventRecord) {
+  return event.categories.reduce((total, category) => total + category.remaining, 0n);
 }
 
 function App() {
-  const [walletAddress, setWalletAddress] = useState("");
-  const [ownerAddress, setOwnerAddress] = useState("");
+  const [activeView, setActiveView] = useState<View>("events");
+  const [busyLabel, setBusyLabel] = useState("");
+  const [categoryForm, setCategoryForm] = useState(initialCategoryForm);
   const [chainId, setChainId] = useState("");
-  const [tokenId, setTokenId] = useState("");
-  const [ticketDetails, setTicketDetails] = useState<TicketDetails | null>(
+  const [eventForm, setEventForm] = useState(initialEventForm);
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [isOrganizer, setIsOrganizer] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notice, setNotice] = useState<Notice>({
+    message:
+      "Connect the wallet that should interact with your local TicketNFT deployment.",
+    tone: "info",
+  });
+  const [ownerAddress, setOwnerAddress] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(
     null,
   );
-  const [mintForm, setMintForm] = useState(initialMintForm);
-  const [transferAddress, setTransferAddress] = useState("");
-  const [status, setStatus] = useState(
-    "Connect the wallet that should interact with the local TicketNFT contract.",
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [tickets, setTickets] = useState<TicketRecord[]>([]);
+  const [transferTargets, setTransferTargets] = useState<Record<number, string>>(
+    {},
   );
-  const [error, setError] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
+  const [walletAddress, setWalletAddress] = useState("");
 
-  const isOwner =
-    walletAddress !== "" &&
-    ownerAddress !== "" &&
-    walletAddress.toLowerCase() === ownerAddress.toLowerCase();
+  const isBusy = busyLabel !== "";
+  const selectedEvent =
+    events.find((event) => event.eventId === selectedEventId) ?? null;
+
+  const metrics = useMemo(() => {
+    const totalCategories = events.reduce(
+      (count, event) => count + event.categories.length,
+      0,
+    );
+    const totalInventoryRemaining = events.reduce(
+      (total, event) => total + getEventRemaining(event),
+      0n,
+    );
+
+    return {
+      availableEvents: events.length,
+      ownedTickets: tickets.length,
+      ticketCategories: totalCategories,
+      totalInventoryRemaining,
+    };
+  }, [events, tickets]);
 
   useEffect(() => {
     void syncWallet(false);
@@ -119,7 +101,61 @@ function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (events.length === 0) {
+      setSelectedEventId(null);
+      return;
+    }
+
+    if (
+      selectedEventId === null ||
+      !events.some((event) => event.eventId === selectedEventId)
+    ) {
+      setSelectedEventId(events[0].eventId);
+    }
+  }, [events, selectedEventId]);
+
+  useEffect(() => {
+    if (!selectedEvent) {
+      setSelectedCategoryId(null);
+      return;
+    }
+
+    if (selectedEvent.categories.length === 0) {
+      setSelectedCategoryId(null);
+      return;
+    }
+
+    if (
+      selectedCategoryId === null ||
+      !selectedEvent.categories.some(
+        (category) => category.categoryId === selectedCategoryId,
+      )
+    ) {
+      setSelectedCategoryId(selectedEvent.categories[0].categoryId);
+    }
+  }, [selectedCategoryId, selectedEvent]);
+
+  useEffect(() => {
+    if (events.length === 0) {
+      return;
+    }
+
+    const matchingEvent = events.find(
+      (event) => event.eventId.toString() === categoryForm.eventId,
+    );
+
+    if (!matchingEvent) {
+      setCategoryForm((current) => ({
+        ...current,
+        eventId: events[0].eventId.toString(),
+      }));
+    }
+  }, [categoryForm.eventId, events]);
+
   async function syncWallet(showIdleMessage: boolean) {
+    setIsRefreshing(true);
+
     try {
       const accounts = await getConnectedAccounts();
 
@@ -127,433 +163,474 @@ function App() {
         setWalletAddress("");
         setOwnerAddress("");
         setChainId("");
+        setIsOrganizer(false);
+        setEvents([]);
+        setTickets([]);
+        setTransferTargets({});
+
         if (showIdleMessage) {
-          setStatus("Wallet disconnected.");
+          setNotice({
+            message: "Wallet disconnected.",
+            tone: "info",
+          });
         }
+
         return;
       }
 
       const context = await getWalletContext();
+      const nextEvents = await loadEvents(context.contract);
+      const nextTickets = await loadOwnedTickets(
+        context.contract,
+        context.signerAddress,
+        nextEvents,
+      );
 
       setWalletAddress(context.signerAddress);
       setOwnerAddress(context.ownerAddress);
       setChainId(context.chainId.toString());
-      setMintForm((current) => ({
-        ...current,
-        to: current.to || context.signerAddress,
-      }));
+      setIsOrganizer(context.isOrganizer);
+      setEvents(nextEvents);
+      setTickets(nextTickets);
+      setTransferTargets((current) => {
+        const nextTargets: Record<number, string> = {};
+
+        for (const ticket of nextTickets) {
+          nextTargets[ticket.tokenId] = current[ticket.tokenId] ?? "";
+        }
+
+        return nextTargets;
+      });
+
       if (showIdleMessage) {
-        setStatus("Wallet connected and contract loaded.");
+        setNotice({
+          message: "Wallet connected and local event data loaded.",
+          tone: "success",
+        });
       }
-      setError("");
-    } catch (nextError) {
+    } catch (error) {
       setWalletAddress("");
       setOwnerAddress("");
       setChainId("");
-      setError(formatError(nextError));
+      setIsOrganizer(false);
+      setEvents([]);
+      setTickets([]);
+      setTransferTargets({});
+      setNotice({
+        message: formatError(error),
+        tone: "error",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   }
 
   async function runAction(
     pendingMessage: string,
     successMessage: string,
-    action: () => Promise<void>,
+    action: (context: WalletContext) => Promise<void>,
   ) {
-    setIsBusy(true);
-    setError("");
-    setStatus(pendingMessage);
+    setBusyLabel(pendingMessage);
+    setNotice({
+      message: pendingMessage,
+      tone: "info",
+    });
 
     try {
-      await action();
-      setStatus(successMessage);
+      const context = await getWalletContext();
+      await action(context);
       await syncWallet(false);
-    } catch (nextError) {
-      const friendlyMessage = formatError(nextError);
-      setError(friendlyMessage);
-      setStatus(friendlyMessage);
+      setNotice({
+        message: successMessage,
+        tone: "success",
+      });
+    } catch (error) {
+      setNotice({
+        message: formatError(error),
+        tone: "error",
+      });
     } finally {
-      setIsBusy(false);
+      setBusyLabel("");
     }
   }
 
   async function handleConnectWallet() {
-    await runAction(
-      "Requesting wallet access...",
-      "Wallet connected.",
-      async () => {
-        await connectWallet();
-      },
-    );
-  }
-
-  async function handleMint() {
-    await runAction(
-      "Submitting mint transaction...",
-      "Ticket minted.",
-      async () => {
-        const {
-          contract,
-          ownerAddress: contractOwner,
-          signerAddress,
-        } = await getWalletContext();
-
-        if (signerAddress.toLowerCase() !== contractOwner.toLowerCase()) {
-          throw new Error(
-            `Minting is owner-only. Connect the deployer wallet ${contractOwner} to mint locally.`,
-          );
-        }
-
-        const recipient = mintForm.to.trim() || signerAddress;
-        const tx = await contract.mintTicket(
-          recipient,
-          mintForm.uri.trim(),
-          BigInt(mintForm.eventId),
-          mintForm.ticketType.trim(),
-        );
-        const receipt = await tx.wait();
-        const transferLog = receipt?.logs
-          .map((log: Log): LogDescription | null => {
-            try {
-              return contract.interface.parseLog(log);
-            } catch {
-              return null;
-            }
-          })
-          .find((log: LogDescription | null) => log?.name === "Transfer");
-        const mintedTokenId = transferLog?.args?.tokenId;
-
-        if (mintedTokenId !== undefined) {
-          const mintedTokenIdText = mintedTokenId.toString();
-          setTokenId(mintedTokenIdText);
-          setStatus(`Ticket minted as token #${mintedTokenIdText}.`);
-        }
-      },
-    );
-  }
-
-  async function handleFetchInfo() {
-    await runAction(
-      "Fetching ticket info...",
-      "Ticket info loaded.",
-      async () => {
-        const { contract } = await getWalletContext();
-        const targetTokenId = BigInt(tokenId);
-        const [ticketInfo, tokenOwner, tokenURI] = await Promise.all([
-          contract.getTicketInfo(targetTokenId),
-          contract.ownerOf(targetTokenId),
-          contract.tokenURI(targetTokenId),
-        ]);
-
-        setTicketDetails({
-          eventId: ticketInfo[0].toString(),
-          owner: tokenOwner,
-          redeemed: ticketInfo[2],
-          ticketType: ticketInfo[1],
-          tokenURI,
-        });
-      },
-    );
-  }
-
-  async function handleCheckOwner() {
-    await runAction("Checking owner...", "Owner loaded.", async () => {
-      const { contract } = await getWalletContext();
-      const owner = await contract.ownerOf(BigInt(tokenId));
-
-      setTicketDetails((current) =>
-        current
-          ? {
-              ...current,
-              owner,
-            }
-          : {
-              eventId: "",
-              owner,
-              redeemed: false,
-              ticketType: "",
-              tokenURI: "",
-            },
-      );
+    setBusyLabel("Requesting wallet access...");
+    setNotice({
+      message: "Requesting wallet access...",
+      tone: "info",
     });
+
+    try {
+      await connectWallet();
+      await syncWallet(true);
+    } catch (error) {
+      setNotice({
+        message: formatError(error),
+        tone: "error",
+      });
+    } finally {
+      setBusyLabel("");
+    }
   }
 
-  async function handleRedeem() {
+  async function handlePurchase() {
+    const selectedCategory =
+      selectedEvent?.categories.find(
+        (category) => category.categoryId === selectedCategoryId,
+      ) ?? null;
+
+    if (!selectedEvent || !selectedCategory) {
+      setNotice({
+        message: "Choose a ticket category before purchasing.",
+        tone: "error",
+      });
+      return;
+    }
+
     await runAction(
-      "Submitting redeem transaction...",
-      "Ticket redeemed.",
-      async () => {
-        const { contract, signerAddress } = await getWalletContext();
-        const targetTokenId = BigInt(tokenId);
-
-        const currentOwner = await contract.ownerOf(targetTokenId);
-        if (currentOwner.toLowerCase() !== signerAddress.toLowerCase()) {
-          throw new Error(
-            "Only the current ticket owner can redeem this ticket.",
-          );
-        }
-
-        const ticketInfo = await contract.getTicketInfo(targetTokenId);
-        const redeemed = ticketInfo[2];
-
-        if (redeemed) {
-          throw new Error("Ticket has already been redeemed.");
-        }
-
-        const tx = await contract.redeem(targetTokenId);
-        await tx.wait();
-      },
-    );
-  }
-
-  async function handleTransfer() {
-    await runAction(
-      "Submitting transfer transaction...",
-      "Transfer complete.",
-      async () => {
-        const { contract, signerAddress } = await getWalletContext();
-        const targetTokenId = BigInt(tokenId);
-
-        const ticketInfo = await contract.getTicketInfo(targetTokenId);
-        const redeemed = ticketInfo[2];
-
-        if (redeemed) {
-          throw new Error("Redeemed ticket cannot be transferred.");
-        }
-
-        const currentOwner = await contract.ownerOf(targetTokenId);
-        if (currentOwner.toLowerCase() !== signerAddress.toLowerCase()) {
-          throw new Error(
-            "Only the current ticket owner can transfer this ticket.",
-          );
-        }
-
-        if (
-          transferAddress.trim().toLowerCase() === signerAddress.toLowerCase()
-        ) {
-          throw new Error("Ticket is already owned by this address.");
-        }
-
-        const tx = await contract.transferFrom(
-          signerAddress,
-          transferAddress.trim(),
-          targetTokenId,
+      `Purchasing ${selectedCategory.ticketType} ticket...`,
+      "Ticket purchased successfully. You can now find it in My Tickets.",
+      async ({ contract }) => {
+        const tx = await contract.purchaseTicket(
+          selectedEvent.eventId,
+          selectedCategory.categoryId,
+          { value: selectedCategory.price },
         );
         await tx.wait();
       },
     );
+  }
+
+  async function handleRedeem(tokenId: number) {
+    await runAction(
+      `Redeeming ticket #${tokenId}...`,
+      `Ticket #${tokenId} redeemed.`,
+      async ({ contract }) => {
+        const tx = await contract.redeem(tokenId);
+        await tx.wait();
+      },
+    );
+  }
+
+  async function handleTransfer(tokenId: number) {
+    const recipient = transferTargets[tokenId]?.trim() ?? "";
+
+    if (!recipient) {
+      setNotice({
+        message: "Enter a recipient wallet address before transferring.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (!isValidWalletAddress(recipient)) {
+      setNotice({
+        message: "Enter a valid Ethereum wallet address.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (recipient.toLowerCase() === walletAddress.toLowerCase()) {
+      setNotice({
+        message: "That ticket is already owned by this wallet.",
+        tone: "error",
+      });
+      return;
+    }
+
+    await runAction(
+      `Transferring ticket #${tokenId}...`,
+      `Ticket #${tokenId} transferred.`,
+      async ({ contract, signerAddress }) => {
+        const tx = await contract.transferFrom(signerAddress, recipient, tokenId);
+        await tx.wait();
+      },
+    );
+  }
+
+  async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const eventName = eventForm.name.trim();
+
+    if (!eventName) {
+      setNotice({
+        message: "Enter an event name before creating the event.",
+        tone: "error",
+      });
+      return;
+    }
+
+    await runAction(
+      "Creating event...",
+      "Event created. It now appears in the Events view.",
+      async ({ contract }) => {
+        const tx = await contract.createEvent(eventName);
+        await tx.wait();
+        setEventForm(initialEventForm);
+        setActiveView("events");
+      },
+    );
+  }
+
+  async function handleCreateCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const ticketType = categoryForm.ticketType.trim();
+    const metadataURI = categoryForm.metadataURI.trim();
+    const eventIdText = categoryForm.eventId.trim();
+    const maxSupplyText = categoryForm.maxSupply.trim();
+    const priceText = categoryForm.priceEth.trim();
+
+    if (!eventIdText) {
+      setNotice({
+        message: "Select an event before creating a ticket category.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (!ticketType || !metadataURI || !maxSupplyText || !priceText) {
+      setNotice({
+        message: "Complete all category fields before submitting.",
+        tone: "error",
+      });
+      return;
+    }
+
+    let eventId: number;
+    let maxSupply: bigint;
+    let price: bigint;
+
+    try {
+      eventId = Number(eventIdText);
+      maxSupply = BigInt(maxSupplyText);
+      price = parseEther(priceText);
+    } catch {
+      setNotice({
+        message: "Enter a valid event, supply, and ETH price.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (maxSupply <= 0n) {
+      setNotice({
+        message: "Ticket supply must be greater than zero.",
+        tone: "error",
+      });
+      return;
+    }
+
+    await runAction(
+      "Creating ticket category...",
+      "Ticket category created.",
+      async ({ contract }) => {
+        const tx = await contract.createCategory(
+          eventId,
+          ticketType,
+          metadataURI,
+          price,
+          maxSupply,
+        );
+        await tx.wait();
+        setCategoryForm((current) => ({
+          ...initialCategoryForm,
+          eventId: current.eventId,
+        }));
+        setSelectedEventId(eventId);
+        setActiveView("events");
+      },
+    );
+  }
+
+  function setTransferTarget(tokenId: number, value: string) {
+    setTransferTargets((current) => ({
+      ...current,
+      [tokenId]: value,
+    }));
   }
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div>
-          <p className="eyebrow">Local Demo</p>
-          <h1>TicketNFT control room</h1>
+    <main className="site-shell">
+      <header className="masthead">
+        <div className="hero-card">
+          <p className="eyebrow">TicketNFTs</p>
+          <h1 className="hero-title">TicketNFTs</h1>
+          <p className="hero-lead">
+            A student-built ticketing prototype for programmable digital
+            ownership.
+          </p>
           <p className="hero-copy">
-            Connect a wallet, mint a ticket as the contract owner, inspect the
-            metadata, transfer it before redemption, and verify transfers fail
-            after redemption.
+            Browse local events, purchase from inventory-backed ticket classes,
+            manage tickets in your wallet, and switch to organizer tools when
+            you need to set up a demo event.
           </p>
+
+          <div className="metric-row">
+            <article className="metric-card">
+              <p className="metric-label">Events</p>
+              <p className="metric-value">{metrics.availableEvents}</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">Categories</p>
+              <p className="metric-value">{metrics.ticketCategories}</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">Inventory Left</p>
+              <p className="metric-value">
+                {metrics.totalInventoryRemaining.toString()}
+              </p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">My Tickets</p>
+              <p className="metric-value">{metrics.ownedTickets}</p>
+            </article>
+          </div>
         </div>
 
-        <div className="status-card">
-          <p className="label">Connected wallet</p>
-          <p className="value">
-            {walletAddress ? shortenAddress(walletAddress) : "Not connected"}
-          </p>
-          <p className="label">Contract owner</p>
-          <p className="value">
-            {ownerAddress ? shortenAddress(ownerAddress) : "Unknown"}
-          </p>
-          <p className="label">Chain ID</p>
-          <p className="value">{chainId || "Unknown"}</p>
-          <p className={`badge ${isOwner ? "owner" : "viewer"}`}>
-            {isOwner
-              ? "Mint enabled for this wallet"
-              : "Mint requires the deployer wallet"}
-          </p>
-          <button onClick={handleConnectWallet} disabled={isBusy}>
-            Connect wallet
-          </button>
-        </div>
-      </section>
-
-      <section className="feedback-row">
-        <div className="feedback-box">
-          <p className="label">Status</p>
-          <p>{status}</p>
-        </div>
-        <div className={`feedback-box ${error ? "error" : ""}`}>
-          <p className="label">Latest error</p>
-          <p>{error || "No errors."}</p>
-        </div>
-      </section>
-
-      <section className="grid">
-        <article className="panel">
-          <div className="panel-header">
+        <aside className="wallet-card">
+          <div className="wallet-header">
             <div>
-              <p className="eyebrow">Step 1</p>
-              <h2>Mint Ticket</h2>
+              <p className="eyebrow">Wallet</p>
+              <h2>Wallet & Contract</h2>
+              <p className="wallet-copy">
+                Useful connection details for the currently configured TicketNFT
+                deployment.
+              </p>
             </div>
-            <p className="hint">This action is owner-only on-chain.</p>
+            <span className={`pill ${isOrganizer ? "success" : "neutral"}`}>
+              {isOrganizer ? "Organizer enabled" : "Buyer mode"}
+            </span>
           </div>
 
-          <label>
-            Recipient
-            <input
-              value={mintForm.to}
-              onChange={(event) =>
-                setMintForm((current) => ({
-                  ...current,
-                  to: event.target.value,
-                }))
-              }
-              placeholder="0x..."
-            />
-          </label>
-
-          <label>
-            Token URI
-            <input
-              value={mintForm.uri}
-              onChange={(event) =>
-                setMintForm((current) => ({
-                  ...current,
-                  uri: event.target.value,
-                }))
-              }
-              placeholder="ipfs://demo-ticket"
-            />
-          </label>
-
-          <div className="two-up">
-            <label>
-              Event ID
-              <input
-                value={mintForm.eventId}
-                onChange={(event) =>
-                  setMintForm((current) => ({
-                    ...current,
-                    eventId: event.target.value,
-                  }))
-                }
-                inputMode="numeric"
-                placeholder="1"
-              />
-            </label>
-
-            <label>
-              Ticket type
-              <input
-                value={mintForm.ticketType}
-                onChange={(event) =>
-                  setMintForm((current) => ({
-                    ...current,
-                    ticketType: event.target.value,
-                  }))
-                }
-                placeholder="VIP"
-              />
-            </label>
-          </div>
-
-          <button onClick={handleMint} disabled={isBusy || !isOwner}>
-            Mint ticket
-          </button>
-        </article>
-
-        <article className="panel">
-          <div className="panel-header">
+          <div className="wallet-grid">
             <div>
-              <p className="eyebrow">Step 2</p>
-              <h2>Inspect Ticket</h2>
+              <p className="detail-label">Connected wallet</p>
+              <p className="detail-value">
+                {walletAddress ? shortenAddress(walletAddress) : "Not connected"}
+              </p>
             </div>
-            <p className="hint">
-              Use the minted token ID or any existing token.
-            </p>
+            <div>
+              <p className="detail-label">Contract owner</p>
+              <p className="detail-value">
+                {ownerAddress ? shortenAddress(ownerAddress) : "Unknown"}
+              </p>
+            </div>
+            <div className="wallet-span">
+              <p className="detail-label">Contract address</p>
+              <p className="detail-value wrap">
+                {CONFIGURED_CONTRACT_ADDRESS || "Not configured"}
+              </p>
+            </div>
+            <div>
+              <p className="detail-label">Chain ID</p>
+              <p className="detail-value">{chainId || "Unknown"}</p>
+            </div>
+            <div>
+              <p className="detail-label">Sync status</p>
+              <p className="detail-value">
+                {isRefreshing ? "Refreshing…" : "Ready"}
+              </p>
+            </div>
           </div>
-
-          <label>
-            Token ID
-            <input
-              value={tokenId}
-              onChange={(event) => setTokenId(event.target.value)}
-              inputMode="numeric"
-              placeholder="0"
-            />
-          </label>
 
           <div className="button-row">
-            <button onClick={handleFetchInfo} disabled={isBusy || !tokenId}>
-              Fetch ticket info
+            <button onClick={() => void handleConnectWallet()} disabled={isBusy}>
+              Connect wallet
             </button>
-            <button onClick={handleCheckOwner} disabled={isBusy || !tokenId}>
-              Check owner
+            <button
+              className="button-secondary"
+              onClick={() => void syncWallet(true)}
+              disabled={isBusy || isRefreshing}
+              type="button"
+            >
+              Refresh data
             </button>
           </div>
+        </aside>
+      </header>
 
-          <div className="details-card">
-            <p className="label">Event ID</p>
-            <p className="value">{ticketDetails?.eventId || "-"}</p>
-            <p className="label">Ticket type</p>
-            <p className="value">{ticketDetails?.ticketType || "-"}</p>
-            <p className="label">Token URI</p>
-            <p className="value wrap">{ticketDetails?.tokenURI || "-"}</p>
-            <p className="label">Current owner</p>
-            <p className="value wrap">{ticketDetails?.owner || "-"}</p>
-            <p className="label">Redeemed</p>
-            <p className="value">
-              {ticketDetails ? (ticketDetails.redeemed ? "Yes" : "No") : "-"}
-            </p>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Step 3</p>
-              <h2>Redeem Ticket</h2>
-            </div>
-            <p className="hint">Only the current token owner can redeem.</p>
-          </div>
-
-          <p className="instruction">
-            After redemption, any later transfer should revert with the contract
-            error about redeemed tickets.
-          </p>
-
-          <button onClick={handleRedeem} disabled={isBusy || !tokenId}>
-            Redeem ticket
-          </button>
-        </article>
-
-        <article className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Step 4</p>
-              <h2>Transfer Ticket</h2>
-            </div>
-            <p className="hint">Transfer works only before redemption.</p>
-          </div>
-
-          <label>
-            Recipient address
-            <input
-              value={transferAddress}
-              onChange={(event) => setTransferAddress(event.target.value)}
-              placeholder="0x..."
-            />
-          </label>
-
-          <button
-            onClick={handleTransfer}
-            disabled={isBusy || !tokenId || !transferAddress}
-          >
-            Transfer ticket
-          </button>
-        </article>
+      <section className={`notice-banner ${notice.tone}`}>
+        <p className="notice-label">{busyLabel || "Status"}</p>
+        <p>{notice.message}</p>
       </section>
+
+      <nav className="view-nav" aria-label="Primary views">
+        <button
+          className={activeView === "events" ? "nav-pill active" : "nav-pill"}
+          onClick={() => setActiveView("events")}
+          type="button"
+        >
+          Events
+        </button>
+        <button
+          className={activeView === "tickets" ? "nav-pill active" : "nav-pill"}
+          onClick={() => setActiveView("tickets")}
+          type="button"
+        >
+          My Tickets
+        </button>
+        <button
+          className={activeView === "organizer" ? "nav-pill active" : "nav-pill"}
+          onClick={() => setActiveView("organizer")}
+          type="button"
+        >
+          Organizer
+        </button>
+      </nav>
+
+      {!walletAddress ? (
+        <section className="empty-state">
+          <p className="eyebrow">Getting Started</p>
+          <h2>Connect MetaMask to load your local TicketNFTs data.</h2>
+          <p className="support-copy">
+            This frontend keeps the local wallet flow from the original demo, so
+            event browsing and ticket ownership reflect the currently connected
+            account on your local Hardhat deployment.
+          </p>
+        </section>
+      ) : null}
+
+      {walletAddress && activeView === "events" ? (
+        <EventsView
+          events={events}
+          isBusy={isBusy}
+          onPurchase={handlePurchase}
+          onSelectCategory={setSelectedCategoryId}
+          onSelectEvent={setSelectedEventId}
+          selectedCategoryId={selectedCategoryId}
+          selectedEvent={selectedEvent}
+          selectedEventId={selectedEventId}
+        />
+      ) : null}
+
+      {walletAddress && activeView === "tickets" ? (
+        <MyTicketsView
+          isBusy={isBusy}
+          onRedeem={handleRedeem}
+          onTransfer={handleTransfer}
+          setTransferTarget={setTransferTarget}
+          tickets={tickets}
+          transferTargets={transferTargets}
+        />
+      ) : null}
+
+      {walletAddress && activeView === "organizer" ? (
+        <OrganizerView
+          categoryForm={categoryForm}
+          events={events}
+          eventForm={eventForm}
+          isBusy={isBusy}
+          isOrganizer={isOrganizer}
+          onCategorySubmit={handleCreateCategory}
+          onCreateEvent={handleCreateEvent}
+          setCategoryForm={setCategoryForm}
+          setEventForm={setEventForm}
+        />
+      ) : null}
     </main>
   );
 }
