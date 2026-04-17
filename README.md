@@ -28,21 +28,21 @@ Implemented:
 
 ## Architecture Summary
 
-- [`contracts/TicketNFT.sol`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/contracts/TicketNFT.sol)
+- [`contracts/TicketNFT.sol`](contracts/TicketNFT.sol)
   - single ERC-721 contract
   - stores events, categories, inventory, ticket references, and redemption state
-- [`frontend/`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend)
+- [`frontend/`](frontend/)
   - React + Vite frontend
   - connects through MetaMask
   - resolves IPFS metadata through an HTTP gateway
-- [`scripts/deploy.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/deploy.ts)
+- [`scripts/deploy.ts`](scripts/deploy.ts)
   - deploys to localhost or Sepolia
   - writes the matching frontend env file
-- [`scripts/createCategoryWithMetadata.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/scripts/createCategoryWithMetadata.ts)
+- [`scripts/createCategoryWithMetadata.ts`](scripts/createCategoryWithMetadata.ts)
   - generates metadata and optional image assets
   - uploads to IPFS through Pinata
   - creates the category on-chain
-- [`test/TicketNFT.test.ts`](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/test/TicketNFT.test.ts)
+- [`test/TicketNFT.test.ts`](test/TicketNFT.test.ts)
   - contract-level test suite
 
 ## Metadata / IPFS Summary
@@ -87,7 +87,7 @@ npm run node
 npm run deploy:local
 ```
 
-This writes [frontend/.env.local](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend/.env.local:1).
+This writes `frontend/.env.local`.
 
 3. Start the frontend:
 
@@ -133,7 +133,7 @@ Deploy to Sepolia:
 npm run deploy:sepolia
 ```
 
-This writes [frontend/.env.sepolia.local](/Users/pradnyankhodke/School/CS/CS521/TicketNFTs/frontend/.env.sepolia.local:1).
+This writes `frontend/.env.sepolia.local`.
 
 Start the frontend against Sepolia:
 
