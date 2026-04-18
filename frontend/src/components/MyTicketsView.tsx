@@ -58,6 +58,14 @@ export function MyTicketsView({
                   </span>
                 </div>
 
+                <div className="category-chip-row">
+                  <span
+                    className={`category-chip ${ticket.transferable ? "" : "muted"}`}
+                  >
+                    {ticket.transferable ? "Transferable" : "Soul-bound"}
+                  </span>
+                </div>
+
                 {ticket.imageUrl ? (
                   <div className="ticket-media">
                     <img
@@ -100,6 +108,12 @@ export function MyTicketsView({
                     <p className="detail-value">{ticket.categoryId}</p>
                   </div>
                   <div>
+                    <p className="detail-label">Transferability</p>
+                    <p className="detail-value">
+                      {ticket.transferable ? "Transferable" : "Soul-bound"}
+                    </p>
+                  </div>
+                  <div>
                     <p className="detail-label">Owner</p>
                     <p className="detail-value wrap">{ticket.owner}</p>
                   </div>
@@ -130,6 +144,7 @@ export function MyTicketsView({
                     </label>
                     <input
                       id={`transfer-${ticket.tokenId}`}
+                      disabled={isBusy || ticket.redeemed || !ticket.transferable}
                       onChange={(event) =>
                         setTransferTarget(ticket.tokenId, event.target.value)
                       }
@@ -138,12 +153,19 @@ export function MyTicketsView({
                     />
                     <button
                       className="button-secondary"
-                      disabled={isBusy || ticket.redeemed}
+                      disabled={
+                        isBusy || ticket.redeemed || !ticket.transferable
+                      }
                       onClick={() => void onTransfer(ticket.tokenId)}
                       type="button"
                     >
                       Transfer ticket
                     </button>
+                    {!ticket.transferable ? (
+                      <p className="support-copy">
+                        Soul-bound tickets cannot be transferred.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </article>

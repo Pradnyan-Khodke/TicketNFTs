@@ -34,6 +34,7 @@ const initialCategoryForm = {
   maxSupply: "100",
   priceEth: "0.01",
   ticketType: "VIP",
+  transferable: true,
 };
 
 function shortenAddress(address: string) {
@@ -134,6 +135,7 @@ function App() {
       priceEth,
       "--max-supply",
       maxSupply,
+      ...(categoryForm.transferable ? [] : ["--soulbound"]),
     ].join(" ");
 
     return {
@@ -145,6 +147,7 @@ function App() {
     categoryForm.maxSupply,
     categoryForm.priceEth,
     categoryForm.ticketType,
+    categoryForm.transferable,
     chainId,
     selectedOrganizerEvent,
   ]);
@@ -573,12 +576,8 @@ function App() {
       {!walletAddress ? (
         <section className="empty-state">
           <p className="eyebrow">Getting Started</p>
-          <h2>Connect MetaMask to load your local TicketNFTs data.</h2>
-          <p className="support-copy">
-            This frontend keeps the local wallet flow from the original demo, so
-            event browsing and ticket ownership reflect the currently connected
-            account on your local Hardhat deployment.
-          </p>
+          <h2>Connect MetaMask to load tickets and events.</h2>
+          <p className="support-copy">Use the wallet connected to the active network.</p>
         </section>
       ) : null}
 

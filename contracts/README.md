@@ -1,16 +1,17 @@
 # Contracts
 
-This directory contains the Solidity contract for the project.
+Solidity contract for the project.
 
 ## Current Contract
 
 - `TicketNFT.sol`
   - ERC-721 ticket contract
   - organizer/admin event creation
-  - ticket categories with price and supply
+  - ticket categories with price, supply, and transferability
   - purchase flow that mints tickets automatically
   - one-time redemption
   - transfers blocked after redemption
+  - soul-bound categories that cannot be transferred
 
 ## Stored Data
 
@@ -28,6 +29,7 @@ Per category:
 - price
 - max supply
 - minted count
+- transferable / soul-bound flag
 
 Per ticket:
 
@@ -35,11 +37,13 @@ Per ticket:
 - `categoryId`
 - `ticketType`
 - redemption state
+- transferability snapshot
 
 ## Notes
 
 - one contract handles the full ticket flow
 - metadata is category-level
+- transferability is category-level
 - a legacy owner-only `mintTicket(...)` helper still exists, but the main flow is purchase-based
 
 ## Usage

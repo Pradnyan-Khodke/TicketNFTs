@@ -265,6 +265,18 @@ export function EventsView({
                             </span>
                           </div>
 
+                          <div className="category-chip-row">
+                            <span
+                              className={`category-chip ${
+                                category.transferable ? "" : "muted"
+                              }`}
+                            >
+                              {category.transferable
+                                ? "Transferable"
+                                : "Soul-bound"}
+                            </span>
+                          </div>
+
                           <p className="support-copy wrap">
                             {category.metadataDescription ??
                               `Metadata ${category.metadataURI}`}

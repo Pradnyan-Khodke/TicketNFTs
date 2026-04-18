@@ -1,6 +1,6 @@
 # Scripts
 
-Deployment and metadata utilities live here.
+Deployment and metadata utilities.
 
 ## Current Scripts
 
@@ -13,6 +13,7 @@ Deployment and metadata utilities live here.
   - generates or uploads an image
   - uploads metadata to IPFS through Pinata
   - creates the category on-chain
+  - supports transferable and soul-bound categories
 
 ## Env
 
@@ -45,6 +46,7 @@ Create local category metadata:
 ```bash
 npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
 npm run metadata:category -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+npm run metadata:category -- --event-id 0 --ticket-type ENTRY --price-eth 0.01 --max-supply 100 --upload-image --soulbound
 ```
 
 ## Sepolia Commands
@@ -60,11 +62,14 @@ Create Sepolia category metadata:
 ```bash
 npm run metadata:category:sepolia:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
 npm run metadata:category:sepolia -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+npm run metadata:category:sepolia -- --event-id 0 --ticket-type ENTRY --price-eth 0.01 --max-supply 100 --upload-image --soulbound
 ```
 
 ## Metadata Notes
 
 - metadata is category-level
+- transferability is category-level
 - the contract stores one `metadataURI` per category
+- the contract stores one transferability rule per category
 - tickets in the same category share the same metadata file
 - the Organizer view generates the correct metadata command, but does not upload directly

@@ -2,7 +2,7 @@
 
 ## Thesis
 
-Treat a ticket as programmable digital ownership rather than a static pass. Ownership, purchase eligibility, redemption state, and transfer restrictions live on-chain. Display metadata and images stay off-chain.
+Treat a ticket as programmable ownership. Ownership, redemption, and transfer rules live on-chain. Metadata and images stay off-chain.
 
 ## Final Design
 
@@ -21,6 +21,7 @@ The contract stores:
 - category price
 - category max supply
 - category minted count
+- category transferability
 - ticket `eventId`
 - ticket `categoryId`
 - ticket `ticketType`
@@ -34,6 +35,7 @@ Main flows:
 - purchase mints the NFT directly to the buyer
 - owner can redeem once
 - redeemed tickets cannot be transferred
+- soul-bound categories cannot be transferred at all
 
 ## Metadata Model
 
@@ -49,6 +51,7 @@ On-chain:
 - redemption state
 - transfer restrictions
 - category `metadataURI`
+- category transferability
 
 Off-chain on IPFS:
 
@@ -57,7 +60,7 @@ Off-chain on IPFS:
 - image
 - display-friendly event/category fields
 
-This keeps the project explainable and avoids a backend.
+This avoids a backend and keeps the flow simple.
 
 ## Frontend Model
 
@@ -68,7 +71,7 @@ The frontend provides:
 - My Tickets view for owned-ticket inspection, redemption, and transfer
 - Organizer view for event creation and category command generation
 
-Category creation is script-driven. The frontend generates the correct metadata command instead of uploading directly.
+Category creation is script-driven. The frontend generates the command instead of uploading directly.
 
 ## Deployment Model
 
@@ -88,6 +91,7 @@ Chosen:
 
 - one contract instead of multiple contracts
 - category-level metadata instead of per-ticket metadata
+- category-level transferability instead of per-ticket transfer policies
 - script-based IPFS uploads instead of a backend uploader
 - minimal event discovery without extra indexing
 

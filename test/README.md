@@ -1,6 +1,6 @@
 # Tests
 
-This directory contains the Hardhat contract tests.
+Hardhat contract tests.
 
 ## Current Coverage
 
@@ -12,6 +12,7 @@ This directory contains the Hardhat contract tests.
 - ticket ownership after purchase
 - redemption rules
 - transfer before redemption
+- soul-bound transfer rejection
 - transfer blocked after redemption
 - legacy owner-only mint restriction
 - error handling for nonexistent tokens

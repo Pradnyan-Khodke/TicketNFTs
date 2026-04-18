@@ -10,6 +10,7 @@ type CategoryFormState = {
   maxSupply: string;
   priceEth: string;
   ticketType: string;
+  transferable: boolean;
 };
 
 type OrganizerViewProps = {
@@ -166,6 +167,21 @@ export function OrganizerView({
                 placeholder="0.01"
                 value={categoryForm.priceEth}
               />
+
+              <label className="checkbox-row" htmlFor="category-transferable">
+                <input
+                  checked={categoryForm.transferable}
+                  id="category-transferable"
+                  onChange={(event) =>
+                    setCategoryForm((current) => ({
+                      ...current,
+                      transferable: event.target.checked,
+                    }))
+                  }
+                  type="checkbox"
+                />
+                <span>Transferable before redemption</span>
+              </label>
 
               <p className="support-copy">
                 Categories are created by the metadata script.

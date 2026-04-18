@@ -20,13 +20,14 @@ const ABI = [
   "function getEventCount() view returns (uint256)",
   "function getTotalMintedTickets() view returns (uint256)",
   "function getEventInfo(uint256 eventId) view returns (string, address, bool, uint256)",
-  "function getCategory(uint256 eventId, uint256 categoryId) view returns (string, string, uint256, uint256, uint256, uint256)",
+  "function getCategory(uint256 eventId, uint256 categoryId) view returns (string, string, uint256, uint256, uint256, uint256, bool)",
   "function getTicketInfo(uint256 tokenId) view returns (uint256, string, bool)",
   "function getTicketCategoryId(uint256 tokenId) view returns (uint256)",
+  "function getTicketTransferable(uint256 tokenId) view returns (bool)",
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function ownerOf(uint256 tokenId) view returns (address)",
   "function createEvent(string name) returns (uint256)",
-  "function createCategory(uint256 eventId, string ticketType, string metadataURI, uint256 price, uint256 maxSupply) returns (uint256)",
+  "function createCategory(uint256 eventId, string ticketType, string metadataURI, uint256 price, uint256 maxSupply, bool transferable) returns (uint256)",
   "function purchaseTicket(uint256 eventId, uint256 categoryId) payable returns (uint256)",
   "function redeem(uint256 tokenId)",
   "function transferFrom(address from, address to, uint256 tokenId)",
@@ -65,6 +66,7 @@ export type EventCategory = {
   price: bigint;
   remaining: bigint;
   ticketType: string;
+  transferable: boolean;
 };
 
 export type EventRecord = {
@@ -92,6 +94,7 @@ export type TicketRecord = {
   ticketType: string;
   tokenId: number;
   tokenURI: string;
+  transferable: boolean;
 };
 
 type NftMetadata = {
@@ -247,7 +250,15 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
       );
       const categories = await Promise.all(
         categoryIds.map(async (categoryId) => {
-          const [ticketType, metadataURI, price, maxSupply, minted, remaining] =
+          const [
+            ticketType,
+            metadataURI,
+            price,
+            maxSupply,
+            minted,
+            remaining,
+            transferable,
+          ] =
             await contract.getCategory(eventId, categoryId);
           let metadataPromise = metadataCache.get(metadataURI);
 
@@ -271,6 +282,7 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
             price,
             remaining,
             ticketType,
+            transferable,
           } satisfies EventCategory;
         })
       );
@@ -309,10 +321,11 @@ export async function loadOwnedTickets(
       continue;
     }
 
-    const [ticketInfo, categoryIdRaw, tokenURI] = await Promise.all([
+    const [ticketInfo, categoryIdRaw, tokenURI, transferableRaw] = await Promise.all([
       contract.getTicketInfo(tokenId),
       contract.getTicketCategoryId(tokenId),
       contract.tokenURI(tokenId),
+      contract.getTicketTransferable(tokenId),
     ]);
 
     const eventId = Number(ticketInfo[0]);
@@ -350,6 +363,7 @@ export async function loadOwnedTickets(
       ticketType: ticketInfo[1],
       tokenId,
       tokenURI,
+      transferable: Boolean(transferableRaw),
     });
   }
 
@@ -487,6 +501,10 @@ export function formatError(error: unknown) {
 
     if (normalized.includes("redeemed ticket cannot be transferred")) {
       return "Redeemed tickets cannot be transferred.";
+    }
+
+    if (normalized.includes("soul-bound ticket cannot be transferred")) {
+      return "Soul-bound tickets cannot be transferred.";
     }
 
     if (normalized.includes("ticket already redeemed")) {

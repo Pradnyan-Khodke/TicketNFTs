@@ -22,6 +22,7 @@ contract TicketNFT is ERC721, Ownable {
         uint256 price;
         uint256 maxSupply;
         uint256 minted;
+        bool transferable;
         bool exists;
     }
 
@@ -29,6 +30,7 @@ contract TicketNFT is ERC721, Ownable {
         uint256 eventId;
         uint256 categoryId;
         string ticketType;
+        bool transferable;
     }
 
     mapping(address => bool) private _organizers;
@@ -102,7 +104,8 @@ contract TicketNFT is ERC721, Ownable {
         string memory ticketType,
         string memory metadataURI,
         uint256 price,
-        uint256 maxSupply
+        uint256 maxSupply,
+        bool transferable
     ) external onlyEventManager(eventId) returns (uint256) {
         require(bytes(ticketType).length > 0, "Ticket type required");
         require(bytes(metadataURI).length > 0, "Metadata URI required");
@@ -118,6 +121,7 @@ contract TicketNFT is ERC721, Ownable {
             price: price,
             maxSupply: maxSupply,
             minted: 0,
+            transferable: transferable,
             exists: true
         });
 
@@ -145,7 +149,8 @@ contract TicketNFT is ERC721, Ownable {
                 category.metadataURI,
                 eventId,
                 categoryId,
-                category.ticketType
+                category.ticketType,
+                category.transferable
             );
     }
 
@@ -155,7 +160,15 @@ contract TicketNFT is ERC721, Ownable {
         uint256 eventId,
         string memory ticketType
     ) external onlyOwner returns (uint256) {
-        return _mintTicket(to, uri, eventId, type(uint256).max, ticketType);
+        return
+            _mintTicket(
+                to,
+                uri,
+                eventId,
+                type(uint256).max,
+                ticketType,
+                true
+            );
     }
 
     function redeem(uint256 tokenId) external {
@@ -184,6 +197,11 @@ contract TicketNFT is ERC721, Ownable {
     function getTicketCategoryId(uint256 tokenId) external view returns (uint256) {
         _requireOwned(tokenId);
         return _ticketData[tokenId].categoryId;
+    }
+
+    function getTicketTransferable(uint256 tokenId) external view returns (bool) {
+        _requireOwned(tokenId);
+        return _ticketData[tokenId].transferable;
     }
 
     function getEventCount() external view returns (uint256) {
@@ -229,7 +247,8 @@ contract TicketNFT is ERC721, Ownable {
             uint256 price,
             uint256 maxSupply,
             uint256 minted,
-            uint256 remaining
+            uint256 remaining,
+            bool transferable
         )
     {
         require(_events[eventId].exists, "Event does not exist");
@@ -243,7 +262,8 @@ contract TicketNFT is ERC721, Ownable {
             category.price,
             category.maxSupply,
             category.minted,
-            category.maxSupply - category.minted
+            category.maxSupply - category.minted,
+            category.transferable
         );
     }
 
@@ -263,6 +283,14 @@ contract TicketNFT is ERC721, Ownable {
             revert("Redeemed ticket cannot be transferred");
         }
 
+        if (
+            from != address(0) &&
+            to != address(0) &&
+            !_ticketData[tokenId].transferable
+        ) {
+            revert("Soul-bound ticket cannot be transferred");
+        }
+
         return super._update(to, tokenId, auth);
     }
 
@@ -271,7 +299,8 @@ contract TicketNFT is ERC721, Ownable {
         string memory uri,
         uint256 eventId,
         uint256 categoryId,
-        string memory ticketType
+        string memory ticketType,
+        bool transferable
     ) internal returns (uint256) {
         uint256 tokenId = _nextTokenId;
         _nextTokenId++;
@@ -281,7 +310,8 @@ contract TicketNFT is ERC721, Ownable {
         _ticketData[tokenId] = TicketData({
             eventId: eventId,
             categoryId: categoryId,
-            ticketType: ticketType
+            ticketType: ticketType,
+            transferable: transferable
         });
 
         return tokenId;

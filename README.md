@@ -1,10 +1,8 @@
 # TicketNFTs
 
-TicketNFTs is an ERC-721 ticketing project focused on programmable ownership. The contract issues tickets as NFTs, tracks event/category inventory, supports direct purchase and redemption, and blocks transfers after redemption. The frontend turns that flow into a small ticketing app for local and Sepolia demos.
+ERC-721 ticketing app with on-chain inventory, purchase, redemption, and transfer rules.
 
-## Project Overview
-
-Main idea:
+## Overview
 
 - represent tickets as ERC-721 NFTs
 - keep ticket inventory on-chain by event and category
@@ -18,9 +16,11 @@ Implemented:
 
 - organizer/admin event creation
 - per-event ticket categories with price, max supply, minted count, and remaining inventory
+- per-category transferability rules
 - purchase flow that mints ERC-721 tickets automatically
 - ticket ownership, transfer, and redemption lifecycle
 - redeemed tickets cannot be transferred
+- soul-bound categories that cannot be transferred after minting
 - category-level NFT metadata stored as `ipfs://...` URIs
 - React frontend for browsing events, purchasing, viewing owned tickets, redeeming, and transferring
 - local deployment flow
@@ -30,7 +30,7 @@ Implemented:
 
 - [`contracts/TicketNFT.sol`](contracts/TicketNFT.sol)
   - single ERC-721 contract
-  - stores events, categories, inventory, ticket references, and redemption state
+  - stores events, categories, inventory, transferability, ticket references, and redemption state
 - [`frontend/`](frontend/)
   - React + Vite frontend
   - connects through MetaMask
@@ -52,6 +52,7 @@ Metadata is category-level:
 - each category stores one `metadataURI` on-chain
 - all tickets in that category share the same metadata file
 - on-chain data covers ownership, event/category references, redemption state, and transfer rules
+- metadata commands can mark a category as soul-bound
 - off-chain IPFS data covers display metadata such as name, description, and image
 
 This keeps the contract and frontend simple while still producing realistic NFT metadata.
@@ -108,13 +109,14 @@ npm run dev
 - generate a category command in the Organizer view
 - run the metadata script
 - purchase a ticket in Events
-- inspect and redeem the ticket in My Tickets
+- inspect, transfer, or redeem the ticket in My Tickets
 
 Local metadata commands:
 
 ```bash
 npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
 npm run metadata:category -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+npm run metadata:category -- --event-id 0 --ticket-type ENTRY --price-eth 0.01 --max-supply 100 --upload-image --soulbound
 ```
 
 ## Sepolia Setup / Deploy Flow
@@ -142,11 +144,12 @@ cd frontend
 npm run dev:sepolia
 ```
 
-Optional Sepolia metadata commands:
+Sepolia metadata commands:
 
 ```bash
 npm run metadata:category:sepolia:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
 npm run metadata:category:sepolia -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100 --upload-image
+npm run metadata:category:sepolia -- --event-id 0 --ticket-type ENTRY --price-eth 0.01 --max-supply 100 --upload-image --soulbound
 ```
 
 MetaMask notes:
@@ -162,6 +165,7 @@ MetaMask notes:
 - metadata/category creation is script-driven
 - frontend display depends on IPFS gateway availability
 - event discovery is intentionally minimal and on-chain only
+- transferability is set at the category level, not per individual ticket
 
 ## Future Work
 
@@ -171,8 +175,6 @@ MetaMask notes:
 - verification or indexer support for public deployments
 
 ## Repo Notes
-
-Recommended cleanup:
 
 - remove `frontend/.env.undefined.local` if it still exists from the earlier deploy-script bug
 - keep `.env`, `frontend/.env.local`, and `frontend/.env.sepolia.local` out of version control

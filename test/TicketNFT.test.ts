@@ -21,7 +21,21 @@ describe("TicketNFT", function () {
     await ticketNFT.connect(organizer).createEvent("Spring Showcase");
     await ticketNFT
       .connect(organizer)
-      .createCategory(0, "VIP", "ipfs://vip-ticket", price, 2);
+      .createCategory(0, "VIP", "ipfs://vip-ticket", price, 2, true);
+
+    return { ticketNFT, owner, organizer, user, otherUser, price };
+  }
+
+  async function createEventWithSoulboundCategory() {
+    const { ticketNFT, owner, organizer, user, otherUser } =
+      await deployTicketNFT();
+    const price = 100n;
+
+    await ticketNFT.connect(owner).setOrganizer(organizer.address, true);
+    await ticketNFT.connect(organizer).createEvent("Expo Entry");
+    await ticketNFT
+      .connect(organizer)
+      .createCategory(0, "Entry", "ipfs://entry-ticket", price, 2, false);
 
     return { ticketNFT, owner, organizer, user, otherUser, price };
   }
@@ -111,7 +125,7 @@ describe("TicketNFT", function () {
       await ticketNFT.connect(organizer).createEvent("Student Showcase");
       await ticketNFT
         .connect(owner)
-        .createCategory(0, "Regular", "ipfs://regular-ticket", 50, 5);
+        .createCategory(0, "Regular", "ipfs://regular-ticket", 50, 5, true);
 
       const categoryInfo = await ticketNFT.getCategory(0, 0);
 
@@ -130,7 +144,7 @@ describe("TicketNFT", function () {
       await expect(
         ticketNFT
           .connect(user)
-          .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 10)
+          .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 10, true)
       ).to.be.revertedWith("Not event organizer");
     });
 
@@ -140,18 +154,32 @@ describe("TicketNFT", function () {
       await expect(
         ticketNFT
           .connect(organizer)
-          .createCategory(0, "", "ipfs://vip-ticket", 100, 10)
+          .createCategory(0, "", "ipfs://vip-ticket", 100, 10, true)
       ).to.be.revertedWith("Ticket type required");
 
       await expect(
-        ticketNFT.connect(organizer).createCategory(0, "VIP", "", 100, 10)
+        ticketNFT
+          .connect(organizer)
+          .createCategory(0, "VIP", "", 100, 10, true)
       ).to.be.revertedWith("Metadata URI required");
 
       await expect(
         ticketNFT
           .connect(organizer)
-          .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 0)
+          .createCategory(0, "VIP", "ipfs://vip-ticket", 100, 0, true)
       ).to.be.revertedWith("Max supply must be greater than zero");
+    });
+
+    it("stores category transferability", async function () {
+      const { ticketNFT, organizer } = await createEventWithCategory();
+
+      await ticketNFT
+        .connect(organizer)
+        .createCategory(0, "Soulbound", "ipfs://soulbound", 10, 1, false);
+
+      const categoryInfo = await ticketNFT.getCategory(0, 1);
+
+      expect(categoryInfo[6]).to.equal(false);
     });
 
     it("allows only the event manager to change event active status", async function () {
@@ -187,6 +215,7 @@ describe("TicketNFT", function () {
       expect(ticketInfo[1]).to.equal("VIP");
       expect(ticketInfo[2]).to.equal(false);
       expect(await ticketNFT.getTicketCategoryId(0)).to.equal(0n);
+      expect(await ticketNFT.getTicketTransferable(0)).to.equal(true);
     });
 
     it("tracks minted and remaining inventory after purchase", async function () {
@@ -309,6 +338,28 @@ describe("TicketNFT", function () {
       expect(ticketInfo[1]).to.equal("VIP");
       expect(ticketInfo[2]).to.equal(false);
       expect(await ticketNFT.getTicketCategoryId(0)).to.equal(0n);
+      expect(await ticketNFT.getTicketTransferable(0)).to.equal(true);
+    });
+
+    it("rejects transfer for a soul-bound category before redemption", async function () {
+      const { ticketNFT, user, otherUser, price } =
+        await createEventWithSoulboundCategory();
+
+      await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
+
+      await expect(
+        ticketNFT.connect(user).transferFrom(user.address, otherUser.address, 0)
+      ).to.be.revertedWith("Soul-bound ticket cannot be transferred");
+    });
+
+    it("allows redemption for a soul-bound ticket", async function () {
+      const { ticketNFT, user, price } = await createEventWithSoulboundCategory();
+
+      await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
+      await ticketNFT.connect(user).redeem(0);
+
+      expect(await ticketNFT.isRedeemed(0)).to.equal(true);
+      expect(await ticketNFT.getTicketTransferable(0)).to.equal(false);
     });
 
     it("allows the new owner to redeem after transfer before redemption", async function () {

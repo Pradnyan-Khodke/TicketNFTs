@@ -37,6 +37,7 @@ type ParsedOptions = {
   maxSupply: bigint;
   outputDir: string;
   priceEth: string;
+  transferable: boolean;
   ticketType: string;
   uploadImage: boolean;
 };
@@ -55,6 +56,7 @@ Optional:
   --description <string>    Custom metadata description
   --image-path <path>       Existing image to include instead of the generated SVG
   --upload-image            Upload the image asset to IPFS instead of embedding it
+  --soulbound               Create a non-transferable category
   --contract <address>      Contract address override (otherwise the matching frontend env file is used)
   --output-dir <path>       Local folder for generated files (default: scripts/generated-metadata)
   --dry-run                 Generate files only and skip IPFS upload + on-chain category creation
@@ -246,6 +248,7 @@ function parseCliArgs(): ParsedOptions {
       "max-supply": { type: "string" },
       "output-dir": { type: "string" },
       "price-eth": { type: "string" },
+      soulbound: { type: "boolean", default: false },
       "ticket-type": { type: "string" },
       "upload-image": { type: "boolean", default: false },
     },
@@ -282,6 +285,7 @@ function parseCliArgs(): ParsedOptions {
     outputDir:
       values["output-dir"] ?? path.join("scripts", "generated-metadata"),
     priceEth: values["price-eth"],
+    transferable: !values.soulbound,
     ticketType: values["ticket-type"].trim(),
     uploadImage: values["upload-image"],
   };
@@ -377,6 +381,10 @@ async function main() {
       { trait_type: "Category ID", value: categoryId },
       { trait_type: "Price (ETH)", value: options.priceEth },
       { trait_type: "Max Supply", value: options.maxSupply.toString() },
+      {
+        trait_type: "Transferability",
+        value: options.transferable ? "transferable" : "soul-bound",
+      },
       { trait_type: "Organizer", value: organizer },
       { trait_type: "Network Chain ID", value: network.chainId.toString() },
       { trait_type: "Contract Address", value: contractAddress },
@@ -423,7 +431,8 @@ async function main() {
     options.ticketType,
     uploadedMetadata.uri,
     priceWei,
-    options.maxSupply
+    options.maxSupply,
+    options.transferable
   );
   await tx.wait();
 
