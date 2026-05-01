@@ -293,6 +293,8 @@ describe("TicketNFT", function () {
       const { ticketNFT, user } = await purchaseVipTicket();
 
       expect(await ticketNFT.ownerOf(0)).to.equal(user.address);
+      expect(await ticketNFT.balanceOf(user.address)).to.equal(1n);
+      expect(await ticketNFT.tokenOfOwnerByIndex(user.address, 0)).to.equal(0n);
     });
 
     it("allows the owner of a purchased ticket to redeem it once", async function () {
@@ -332,6 +334,11 @@ describe("TicketNFT", function () {
         .transferFrom(user.address, otherUser.address, 0);
 
       expect(await ticketNFT.ownerOf(0)).to.equal(otherUser.address);
+      expect(await ticketNFT.balanceOf(user.address)).to.equal(0n);
+      expect(await ticketNFT.balanceOf(otherUser.address)).to.equal(1n);
+      expect(await ticketNFT.tokenOfOwnerByIndex(otherUser.address, 0)).to.equal(
+        0n
+      );
 
       const ticketInfo = await ticketNFT.getTicketInfo(0);
       expect(ticketInfo[0]).to.equal(0n);

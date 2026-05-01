@@ -10,15 +10,20 @@ const CONTRACT_ADDRESS = import.meta.env.VITE_TICKET_NFT_ADDRESS?.trim();
 const EXPECTED_CHAIN_ID = import.meta.env.VITE_TICKET_NFT_CHAIN_ID
   ? BigInt(import.meta.env.VITE_TICKET_NFT_CHAIN_ID)
   : undefined;
+const METADATA_API_URL =
+  import.meta.env.VITE_METADATA_API_URL?.trim() ?? "http://127.0.0.1:3001";
 
 export const CONFIGURED_CONTRACT_ADDRESS = CONTRACT_ADDRESS ?? "";
 export const DEFAULT_IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
+export const CONFIGURED_METADATA_API_URL = METADATA_API_URL;
 
 const ABI = [
   "function owner() view returns (address)",
   "function isOrganizer(address account) view returns (bool)",
   "function getEventCount() view returns (uint256)",
   "function getTotalMintedTickets() view returns (uint256)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function getEventInfo(uint256 eventId) view returns (string, address, bool, uint256)",
   "function getCategory(uint256 eventId, uint256 categoryId) view returns (string, string, uint256, uint256, uint256, uint256, bool)",
   "function getTicketInfo(uint256 tokenId) view returns (uint256, string, bool)",
@@ -51,6 +56,17 @@ export type WalletContext = {
   ownerAddress: string;
   provider: BrowserProvider;
   signerAddress: string;
+};
+
+export type CategoryMetadataRequest = {
+  contractAddress: string;
+  description?: string;
+  eventId: number;
+  maxSupply: string;
+  network: "localhost" | "sepolia";
+  priceEth: string;
+  ticketType: string;
+  transferable: boolean;
 };
 
 export type EventCategory = {
@@ -306,21 +322,15 @@ export async function loadOwnedTickets(
   walletAddress: string,
   knownEvents: EventRecord[] = []
 ): Promise<TicketRecord[]> {
-  const totalMinted = Number(await contract.getTotalMintedTickets());
+  const ownedTokenCount = Number(await contract.balanceOf(walletAddress));
   const eventCache = new Map(
     knownEvents.map((event) => [event.eventId, event])
   );
   const metadataCache = new Map<string, Promise<ResolvedMetadata>>();
-  const normalizedWallet = walletAddress.toLowerCase();
   const tickets: TicketRecord[] = [];
 
-  for (let tokenId = 0; tokenId < totalMinted; tokenId += 1) {
-    const owner = await contract.ownerOf(tokenId);
-
-    if (owner.toLowerCase() !== normalizedWallet) {
-      continue;
-    }
-
+  for (let index = 0; index < ownedTokenCount; index += 1) {
+    const tokenId = Number(await contract.tokenOfOwnerByIndex(walletAddress, index));
     const [ticketInfo, categoryIdRaw, tokenURI, transferableRaw] = await Promise.all([
       contract.getTicketInfo(tokenId),
       contract.getTicketCategoryId(tokenId),
@@ -358,7 +368,7 @@ export async function loadOwnedTickets(
       metadataStatus: resolved.status,
       metadataUrl: resolved.metadataUrl,
       organizer: eventRecord?.organizer ?? "",
-      owner,
+      owner: walletAddress,
       redeemed: ticketInfo[2],
       ticketType: ticketInfo[1],
       tokenId,
@@ -407,6 +417,31 @@ export function resolveMetadataUrl(uri: string) {
 
 export function resolveAssetUrl(uri: string) {
   return resolveMetadataUrl(uri);
+}
+
+export async function generateCategoryMetadata(
+  payload: CategoryMetadataRequest
+) {
+  const response = await fetch(`${METADATA_API_URL}/api/category-metadata`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = (await response.json()) as {
+    error?: string;
+    imageUri?: string;
+    metadata?: NftMetadata;
+    metadataUri?: string;
+  };
+
+  if (!response.ok || !data.metadataUri) {
+    throw new Error(data.error ?? "Failed to generate category metadata.");
+  }
+
+  return data;
 }
 
 async function loadTokenMetadata(
@@ -497,6 +532,13 @@ export function formatError(error: unknown) {
 
     if (normalized.includes("wrong network")) {
       return message;
+    }
+
+    if (
+      normalized.includes("failed to fetch") ||
+      normalized.includes("backend")
+    ) {
+      return "Could not reach the metadata backend.";
     }
 
     if (normalized.includes("redeemed ticket cannot be transferred")) {
