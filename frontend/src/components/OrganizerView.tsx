@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import type { ComponentProps } from "react";
 import type { EventRecord } from "../contract";
 
 type EventFormState = {
@@ -6,6 +6,7 @@ type EventFormState = {
 };
 
 type CategoryFormState = {
+  description: string;
   eventId: string;
   maxSupply: string;
   priceEth: string;
@@ -13,18 +14,16 @@ type CategoryFormState = {
   transferable: boolean;
 };
 
+type FormSubmitHandler = NonNullable<ComponentProps<"form">["onSubmit"]>;
+
 type OrganizerViewProps = {
   categoryForm: CategoryFormState;
   events: EventRecord[];
   eventForm: EventFormState;
   isBusy: boolean;
   isOrganizer: boolean;
-  metadataHint: {
-    dryRun: string;
-    eventName: string;
-    liveRun: string;
-  } | null;
-  onCreateEvent: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
+  onCreateCategory: FormSubmitHandler;
+  onCreateEvent: FormSubmitHandler;
   setCategoryForm: (
     updater: (current: CategoryFormState) => CategoryFormState
   ) => void;
@@ -37,7 +36,7 @@ export function OrganizerView({
   eventForm,
   isBusy,
   isOrganizer,
-  metadataHint,
+  onCreateCategory,
   onCreateEvent,
   setCategoryForm,
   setEventForm,
@@ -51,7 +50,7 @@ export function OrganizerView({
               <p className="eyebrow">Organizer</p>
               <h2>Create event inventory</h2>
             </div>
-            <p className="support-copy">Create events and category commands.</p>
+            <p className="support-copy">Create events and upload metadata-backed categories.</p>
           </div>
 
           {!isOrganizer ? (
@@ -87,11 +86,11 @@ export function OrganizerView({
           <div className="section-header">
             <div>
               <p className="eyebrow">Ticket Classes</p>
-              <h2>Define inventory and pricing</h2>
+              <h2>Create a category</h2>
             </div>
             <p className="support-copy">
-              Set the ticket type, price, and supply, then run the generated
-              command.
+              The backend uploads the image and metadata, then your wallet signs
+              the on-chain category transaction.
             </p>
           </div>
 
@@ -104,7 +103,10 @@ export function OrganizerView({
               <p>Create an event first, then add ticket categories here.</p>
             </div>
           ) : (
-            <div className="form-card">
+            <form
+              className="form-card"
+              onSubmit={(event) => void onCreateCategory(event)}
+            >
               <label htmlFor="category-event">Event</label>
               <select
                 id="category-event"
@@ -155,6 +157,23 @@ export function OrganizerView({
                   />
                 </div>
               </div>
+
+              <label htmlFor="category-description">
+                Description (optional)
+              </label>
+              <textarea
+                id="category-description"
+                onChange={(event) =>
+                  setCategoryForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder="VIP entry for the main event floor."
+                rows={3}
+                value={categoryForm.description}
+              />
+
               <label htmlFor="price-eth">Price in ETH</label>
               <input
                 id="price-eth"
@@ -183,46 +202,12 @@ export function OrganizerView({
                 <span>Transferable before redemption</span>
               </label>
 
-              <p className="support-copy">
-                Categories are created by the metadata script.
-              </p>
-            </div>
+              <button disabled={isBusy} type="submit">
+                Upload metadata and create category
+              </button>
+            </form>
           )}
         </div>
-
-        {isOrganizer && metadataHint ? (
-          <div className="section-card">
-            <div className="section-header">
-              <div>
-                <p className="eyebrow">Metadata Script</p>
-                <h2>Metadata commands</h2>
-              </div>
-              <p className="support-copy">
-                Event #{categoryForm.eventId} {metadataHint.eventName}
-              </p>
-            </div>
-
-            <div className="hint-panel">
-              <p className="detail-label">Dry run</p>
-              <pre className="command-block">{metadataHint.dryRun}</pre>
-              <p className="support-copy">Generates files locally only.</p>
-            </div>
-
-            <div className="hint-panel">
-              <p className="detail-label">
-                Upload image, upload metadata, and create category
-              </p>
-              <pre className="command-block">{metadataHint.liveRun}</pre>
-              <p className="support-copy">
-                Uploads metadata and creates the category.
-              </p>
-            </div>
-
-            <p className="support-copy">
-              Optional: add `--description` or `--image-path`.
-            </p>
-          </div>
-        ) : null}
       </div>
     </section>
   );

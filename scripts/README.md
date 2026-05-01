@@ -9,11 +9,15 @@ Deployment and metadata utilities.
   - writes `frontend/.env.local` for localhost
   - writes `frontend/.env.sepolia.local` for Sepolia
 - `createCategoryWithMetadata.ts`
+  - fallback/manual metadata utility
   - generates metadata JSON
   - generates or uploads an image
   - uploads metadata to IPFS through Pinata
   - creates the category on-chain
   - supports transferable and soul-bound categories
+- `backend/server.js`
+  - local Express service used by the Organizer view
+  - backend-specific notes live in `backend/README.md`
 
 ## Env
 
@@ -26,6 +30,8 @@ PINATA_JWT=your_pinata_jwt_here
 ```
 
 Frontend env files are written automatically by `deploy.ts`.
+
+The backend also reads the root `.env`.
 
 ## Local Commands
 
@@ -41,7 +47,13 @@ Deploy locally:
 npm run deploy:local
 ```
 
-Create local category metadata:
+Start the local metadata backend:
+
+```bash
+npm run backend
+```
+
+Manual local metadata commands:
 
 ```bash
 npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
@@ -57,7 +69,7 @@ Deploy to Sepolia:
 npm run deploy:sepolia
 ```
 
-Create Sepolia category metadata:
+Manual Sepolia metadata commands:
 
 ```bash
 npm run metadata:category:sepolia:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
@@ -72,4 +84,5 @@ npm run metadata:category:sepolia -- --event-id 0 --ticket-type ENTRY --price-et
 - the contract stores one `metadataURI` per category
 - the contract stores one transferability rule per category
 - tickets in the same category share the same metadata file
-- the Organizer view generates the correct metadata command, but does not upload directly
+- the Organizer view now uploads metadata through the backend and then sends `createCategory(...)` through MetaMask
+- the script remains useful for manual uploads or troubleshooting

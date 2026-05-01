@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { parseEther } from "ethers";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import {
+  CONFIGURED_METADATA_API_URL,
   CONFIGURED_CONTRACT_ADDRESS,
   connectWallet,
   formatError,
+  generateCategoryMetadata,
   getConnectedAccounts,
   getWalletContext,
   isValidWalletAddress,
@@ -25,11 +28,16 @@ type Notice = {
   tone: "error" | "info" | "success";
 };
 
+type FormSubmitEvent = Parameters<
+  NonNullable<ComponentProps<"form">["onSubmit"]>
+>[0];
+
 const initialEventForm = {
   name: "",
 };
 
 const initialCategoryForm = {
+  description: "",
   eventId: "",
   maxSupply: "100",
   priceEth: "0.01",
@@ -41,20 +49,16 @@ function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function shellQuote(value: string) {
-  if (value.length === 0) {
-    return "''";
-  }
-
-  return `'${value.replaceAll("'", `'\"'\"'`)}'`;
-}
-
 function getMetadataNetworkName(chainId: string) {
   if (chainId === "11155111") {
     return "sepolia";
   }
 
-  return "localhost";
+  if (chainId === "31337") {
+    return "localhost";
+  }
+
+  throw new Error(`Unsupported chain ID for metadata backend: ${chainId}`);
 }
 
 function getEventRemaining(event: EventRecord) {
@@ -75,7 +79,7 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [notice, setNotice] = useState<Notice>({
     message:
-      "Connect the wallet that should interact with your local TicketNFT deployment.",
+      "Connect the wallet that should interact with the active TicketNFT deployment.",
     tone: "info",
   });
   const [ownerAddress, setOwnerAddress] = useState("");
@@ -92,10 +96,6 @@ function App() {
   const isBusy = busyLabel !== "";
   const selectedEvent =
     events.find((event) => event.eventId === selectedEventId) ?? null;
-  const selectedOrganizerEvent =
-    events.find((event) => event.eventId.toString() === categoryForm.eventId) ??
-    null;
-
   const metrics = useMemo(() => {
     const totalCategories = events.reduce(
       (count, event) => count + event.categories.length,
@@ -113,44 +113,6 @@ function App() {
       totalInventoryRemaining,
     };
   }, [events, tickets]);
-
-  const metadataHint = useMemo(() => {
-    if (!selectedOrganizerEvent) {
-      return null;
-    }
-
-    const ticketType = categoryForm.ticketType.trim() || "VIP";
-    const priceEth = categoryForm.priceEth.trim() || "0.01";
-    const maxSupply = categoryForm.maxSupply.trim() || "100";
-    const metadataNetworkName = getMetadataNetworkName(chainId);
-    const baseCommand = [
-      `HARDHAT_NETWORK=${metadataNetworkName}`,
-      "node",
-      "scripts/createCategoryWithMetadata.ts",
-      "--event-id",
-      selectedOrganizerEvent.eventId.toString(),
-      "--ticket-type",
-      shellQuote(ticketType),
-      "--price-eth",
-      priceEth,
-      "--max-supply",
-      maxSupply,
-      ...(categoryForm.transferable ? [] : ["--soulbound"]),
-    ].join(" ");
-
-    return {
-      dryRun: `${baseCommand} --dry-run`,
-      eventName: selectedOrganizerEvent.name,
-      liveRun: `${baseCommand} --upload-image`,
-    };
-  }, [
-    categoryForm.maxSupply,
-    categoryForm.priceEth,
-    categoryForm.ticketType,
-    categoryForm.transferable,
-    chainId,
-    selectedOrganizerEvent,
-  ]);
 
   useEffect(() => {
     void syncWallet(false);
@@ -263,7 +225,7 @@ function App() {
 
       if (showIdleMessage) {
         setNotice({
-          message: "Wallet connected and local event data loaded.",
+          message: "Wallet connected and event data loaded.",
           tone: "success",
         });
       }
@@ -413,7 +375,7 @@ function App() {
     );
   }
 
-  async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateEvent(event: FormSubmitEvent) {
     event.preventDefault();
 
     const eventName = eventForm.name.trim();
@@ -436,6 +398,97 @@ function App() {
         setActiveView("events");
       }
     );
+  }
+
+  async function handleCreateCategory(event: FormSubmitEvent) {
+    event.preventDefault();
+
+    const eventId = Number(categoryForm.eventId);
+    const ticketType = categoryForm.ticketType.trim();
+    const priceEth = categoryForm.priceEth.trim();
+    const maxSupply = categoryForm.maxSupply.trim();
+    const description = categoryForm.description.trim();
+
+    if (!Number.isInteger(eventId) || eventId < 0) {
+      setNotice({
+        message: "Choose an event before creating a category.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (!ticketType) {
+      setNotice({
+        message: "Enter a ticket category name before creating the category.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (!priceEth) {
+      setNotice({
+        message: "Enter a ticket price before creating the category.",
+        tone: "error",
+      });
+      return;
+    }
+
+    if (!/^\d+$/.test(maxSupply) || Number(maxSupply) <= 0) {
+      setNotice({
+        message: "Enter a whole-number max supply greater than zero.",
+        tone: "error",
+      });
+      return;
+    }
+
+    setBusyLabel("Generating metadata and creating category...");
+    setNotice({
+      message: "Generating metadata and creating category...",
+      tone: "info",
+    });
+
+    try {
+      const context = await getWalletContext();
+      const network = getMetadataNetworkName(context.chainId.toString());
+      const metadataResult = await generateCategoryMetadata({
+        contractAddress: CONFIGURED_CONTRACT_ADDRESS,
+        description: description || undefined,
+        eventId,
+        maxSupply,
+        network,
+        priceEth,
+        ticketType,
+        transferable: categoryForm.transferable,
+      });
+
+      const tx = await context.contract.createCategory(
+        eventId,
+        ticketType,
+        metadataResult.metadataUri,
+        parseEther(priceEth),
+        BigInt(maxSupply),
+        categoryForm.transferable
+      );
+      await tx.wait();
+      setCategoryForm((current) => ({
+        ...initialCategoryForm,
+        eventId: current.eventId,
+      }));
+      setActiveView("events");
+      setNotice({
+        message: "Category created with uploaded metadata.",
+        tone: "success",
+      });
+      setBusyLabel("");
+      void syncWallet(false);
+    } catch (error) {
+      setNotice({
+        message: formatError(error),
+        tone: "error",
+      });
+    } finally {
+      setBusyLabel("");
+    }
   }
 
   function setTransferTarget(tokenId: number, value: string) {
@@ -483,7 +536,7 @@ function App() {
             <div>
               <p className="eyebrow">Wallet</p>
               <h2>Wallet & Contract</h2>
-              <p className="wallet-copy">Current local connection details.</p>
+              <p className="wallet-copy">Current connection details.</p>
             </div>
             <span className={`pill ${isOrganizer ? "success" : "neutral"}`}>
               {isOrganizer ? "Organizer enabled" : "Buyer mode"}
@@ -509,6 +562,12 @@ function App() {
               <p className="detail-label">Contract address</p>
               <p className="detail-value wrap">
                 {CONFIGURED_CONTRACT_ADDRESS || "Not configured"}
+              </p>
+            </div>
+            <div className="wallet-span">
+              <p className="detail-label">Metadata backend</p>
+              <p className="detail-value wrap">
+                {CONFIGURED_METADATA_API_URL}
               </p>
             </div>
             <div>
@@ -612,7 +671,7 @@ function App() {
           eventForm={eventForm}
           isBusy={isBusy}
           isOrganizer={isOrganizer}
-          metadataHint={metadataHint}
+          onCreateCategory={handleCreateCategory}
           onCreateEvent={handleCreateEvent}
           setCategoryForm={setCategoryForm}
           setEventForm={setEventForm}

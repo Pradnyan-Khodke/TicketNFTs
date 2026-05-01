@@ -276,14 +276,10 @@ export async function loadEvents(contract: Contract): Promise<EventRecord[]> {
             transferable,
           ] =
             await contract.getCategory(eventId, categoryId);
-          let metadataPromise = metadataCache.get(metadataURI);
-
-          if (!metadataPromise) {
-            metadataPromise = loadResolvedMetadata(metadataURI);
-            metadataCache.set(metadataURI, metadataPromise);
-          }
-
-          const resolved = await metadataPromise;
+          const resolved = await getCachedResolvedMetadata(
+            metadataCache,
+            metadataURI
+          );
 
           return {
             categoryId,
@@ -350,12 +346,7 @@ export async function loadOwnedTickets(
       }
     }
 
-    let metadataPromise = metadataCache.get(tokenURI);
-    if (!metadataPromise) {
-      metadataPromise = loadResolvedMetadata(tokenURI);
-      metadataCache.set(tokenURI, metadataPromise);
-    }
-    const resolved = await metadataPromise;
+    const resolved = await getCachedResolvedMetadata(metadataCache, tokenURI);
 
     tickets.push({
       categoryId: Number(categoryIdRaw),
@@ -453,8 +444,13 @@ async function loadTokenMetadata(
     return null;
   }
 
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+
   try {
-    const response = await fetch(resolvedUrl);
+    const response = await fetch(resolvedUrl, {
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
       return null;
@@ -463,6 +459,8 @@ async function loadTokenMetadata(
     return (await response.json()) as NftMetadata;
   } catch {
     return null;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -499,6 +497,20 @@ async function loadResolvedMetadata(
     metadataUrl,
     status: "loaded",
   };
+}
+
+function getCachedResolvedMetadata(
+  metadataCache: Map<string, Promise<ResolvedMetadata>>,
+  tokenURI: string
+) {
+  let metadataPromise = metadataCache.get(tokenURI);
+
+  if (!metadataPromise) {
+    metadataPromise = loadResolvedMetadata(tokenURI);
+    metadataCache.set(tokenURI, metadataPromise);
+  }
+
+  return metadataPromise;
 }
 
 export function formatError(error: unknown) {

@@ -17,7 +17,7 @@ React + TypeScript + Vite app for TicketNFTs.
   - disable transfer actions for soul-bound tickets
 - `Organizer`
   - create events
-  - generate category metadata commands for local or Sepolia use
+  - create categories through the metadata backend
   - mark categories as transferable or soul-bound
 
 ## Env Files
@@ -29,12 +29,19 @@ React + TypeScript + Vite app for TicketNFTs.
 
 These files are written by the root deploy script.
 
+Optional:
+
+- `VITE_METADATA_API_URL`
+  - defaults to `http://127.0.0.1:3001`
+  - points the frontend to the local metadata backend
+
 ## Metadata Handling
 
 - the frontend reads `tokenURI` and category metadata URIs
 - `ipfs://...` URIs are resolved through an HTTP gateway
 - fallback UI is shown if metadata or images cannot be loaded
 - transferability is shown in both category and owned-ticket views
+- organizer category creation uploads metadata through the backend, then sends `createCategory(...)` through MetaMask
 
 ## Run Locally
 
@@ -47,9 +54,12 @@ npm install
 cd ..
 npm run node
 npm run deploy:local
+npm run backend
 cd frontend
 npm run dev
 ```
+
+This matches the root README. The only frontend-specific piece is `VITE_METADATA_API_URL` if you want to point at a different backend URL.
 
 ## Run Against Sepolia
 
@@ -57,6 +67,7 @@ From the repo root:
 
 ```bash
 npm run deploy:sepolia
+npm run backend
 cd frontend
 npm run dev:sepolia
 ```
@@ -65,7 +76,7 @@ Use MetaMask on the matching network before connecting.
 
 ## Limitations
 
-- metadata/category creation is still script-driven
+- organizer category creation depends on the backend being available
 - metadata is category-level, not per-ticket
 - transferability is category-level, not per-ticket
 - IPFS display depends on gateway availability

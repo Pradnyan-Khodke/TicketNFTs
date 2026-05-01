@@ -8,7 +8,7 @@ ERC-721 ticketing app with on-chain inventory, purchase, redemption, and transfe
 - keep ticket inventory on-chain by event and category
 - let users purchase tickets directly from available supply
 - use on-chain redemption state to enforce post-entry rules
-- keep metadata off-chain on IPFS without adding a backend
+- keep ticket rules on-chain while using IPFS for metadata and images
 
 ## Feature Summary
 
@@ -35,13 +35,14 @@ Implemented:
   - React + Vite frontend
   - connects through MetaMask
   - resolves IPFS metadata through an HTTP gateway
+- [`backend/`](backend/)
+  - small Express service for metadata upload
+  - returns the `ipfs://...` URI used by category creation
 - [`scripts/deploy.ts`](scripts/deploy.ts)
   - deploys to localhost or Sepolia
   - writes the matching frontend env file
 - [`scripts/createCategoryWithMetadata.ts`](scripts/createCategoryWithMetadata.ts)
-  - generates metadata and optional image assets
-  - uploads to IPFS through Pinata
-  - creates the category on-chain
+  - fallback/manual metadata utility
 - [`test/TicketNFT.test.ts`](test/TicketNFT.test.ts)
   - contract-level test suite
 
@@ -52,8 +53,9 @@ Metadata is category-level:
 - each category stores one `metadataURI` on-chain
 - all tickets in that category share the same metadata file
 - on-chain data covers ownership, event/category references, redemption state, and transfer rules
-- metadata commands can mark a category as soul-bound
 - off-chain IPFS data covers display metadata such as name, description, and image
+- the backend uploads metadata
+- the organizer wallet still signs `createCategory(...)`
 
 This keeps the contract and frontend simple while still producing realistic NFT metadata.
 
@@ -74,6 +76,8 @@ Root `.env` is optional for localhost unless you want IPFS uploads:
 PINATA_JWT=your_pinata_jwt_here
 ```
 
+The backend reads the root `.env`. The frontend still reads `frontend/.env.local` or `frontend/.env.sepolia.local`.
+
 ## Local Demo Flow
 
 1. Start the local node:
@@ -90,28 +94,33 @@ npm run deploy:local
 
 This writes `frontend/.env.local`.
 
-3. Start the frontend:
+3. Start the metadata backend:
+
+```bash
+npm run backend
+```
+
+4. Start the frontend:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-4. In MetaMask:
+5. In MetaMask:
 
 - switch to the local Hardhat network
 - import a funded local account if needed
 - use the deployer/organizer account for event setup
 
-5. Demo flow:
+6. Demo flow:
 
 - create an event in the Organizer view
-- generate a category command in the Organizer view
-- run the metadata script
+- create a category in the Organizer view
 - purchase a ticket in Events
 - inspect, transfer, or redeem the ticket in My Tickets
 
-Local metadata commands:
+Manual metadata commands still exist if you want a script-only flow:
 
 ```bash
 npm run metadata:category:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
@@ -137,6 +146,12 @@ npm run deploy:sepolia
 
 This writes `frontend/.env.sepolia.local`.
 
+Start the metadata backend:
+
+```bash
+npm run backend
+```
+
 Start the frontend against Sepolia:
 
 ```bash
@@ -144,7 +159,7 @@ cd frontend
 npm run dev:sepolia
 ```
 
-Sepolia metadata commands:
+Manual Sepolia metadata commands still exist if you want a script-only flow:
 
 ```bash
 npm run metadata:category:sepolia:dry-run -- --event-id 0 --ticket-type VIP --price-eth 0.01 --max-supply 100
@@ -162,7 +177,7 @@ MetaMask notes:
 
 - one contract only; no resale or marketplace layer
 - metadata is category-level rather than per-ticket
-- metadata/category creation is script-driven
+- metadata upload depends on the local backend being available
 - frontend display depends on IPFS gateway availability
 - event discovery is intentionally minimal and on-chain only
 - transferability is set at the category level, not per individual ticket

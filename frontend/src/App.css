@@ -573,7 +573,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid rgba(38, 52, 93, 0.14);
@@ -585,8 +586,14 @@ select {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: none;
   border-color: rgba(122, 63, 242, 0.5);
   box-shadow: 0 0 0 4px rgba(122, 63, 242, 0.12);

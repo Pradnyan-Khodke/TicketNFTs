@@ -8,9 +8,9 @@ Treat a ticket as programmable ownership. Ownership, redemption, and transfer ru
 
 - one ERC-721 contract
 - one frontend
+- one small backend for metadata uploads
 - one deploy script
 - one metadata/IPFS script
-- no backend
 
 ## Contract Model
 
@@ -60,7 +60,7 @@ Off-chain on IPFS:
 - image
 - display-friendly event/category fields
 
-This avoids a backend and keeps the flow simple.
+This keeps ticket rules on-chain while moving metadata upload behind a small local service.
 
 ## Frontend Model
 
@@ -69,9 +69,12 @@ The frontend provides:
 - Events view for browsing events and categories
 - purchase flow
 - My Tickets view for owned-ticket inspection, redemption, and transfer
-- Organizer view for event creation and category command generation
+- Organizer view for event creation and category setup
 
-Category creation is script-driven. The frontend generates the command instead of uploading directly.
+Category creation is a two-step flow:
+
+- the frontend calls the backend to generate a placeholder image and upload metadata to Pinata
+- the organizer wallet sends `createCategory(...)` with the returned `metadataURI`
 
 ## Deployment Model
 
@@ -92,12 +95,11 @@ Chosen:
 - one contract instead of multiple contracts
 - category-level metadata instead of per-ticket metadata
 - category-level transferability instead of per-ticket transfer policies
-- script-based IPFS uploads instead of a backend uploader
+- a small metadata backend instead of putting Pinata credentials in the frontend
 - minimal event discovery without extra indexing
 
 Not implemented:
 
 - resale or marketplace logic
 - royalty logic
-- backend services
 - public indexing layer
