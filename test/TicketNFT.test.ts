@@ -206,6 +206,26 @@ describe("TicketNFT", function () {
       expect(await ticketNFT.tokenURI(0)).to.equal("ipfs://vip-ticket");
     });
 
+    it("forwards the ticket payment directly to the event organizer", async function () {
+      const { ethers } = await hre.network.connect();
+      const { ticketNFT, organizer, user, price } = await createEventWithCategory();
+      const organizerBalanceBefore = await ethers.provider.getBalance(
+        organizer.address
+      );
+
+      await ticketNFT.connect(user).purchaseTicket(0, 0, { value: price });
+
+      const organizerBalanceAfter = await ethers.provider.getBalance(
+        organizer.address
+      );
+      const contractBalance = await ethers.provider.getBalance(
+        await ticketNFT.getAddress()
+      );
+
+      expect(organizerBalanceAfter - organizerBalanceBefore).to.equal(price);
+      expect(contractBalance).to.equal(0n);
+    });
+
     it("stores the correct ticket data on purchase", async function () {
       const { ticketNFT, price } = await purchaseVipTicket();
 

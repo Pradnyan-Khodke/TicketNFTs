@@ -144,15 +144,19 @@ contract TicketNFT is ERC721, ERC721Enumerable, Ownable {
 
         category.minted++;
 
-        return
-            _mintTicket(
-                msg.sender,
-                category.metadataURI,
-                eventId,
-                categoryId,
-                category.ticketType,
-                category.transferable
-            );
+        uint256 tokenId = _mintTicket(
+            msg.sender,
+            category.metadataURI,
+            eventId,
+            categoryId,
+            category.ticketType,
+            category.transferable
+        );
+
+        (bool sent, ) = payable(eventData.organizer).call{value: msg.value}("");
+        require(sent, "Organizer payment failed");
+
+        return tokenId;
     }
 
     function mintTicket(

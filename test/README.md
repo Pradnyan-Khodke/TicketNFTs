@@ -8,6 +8,7 @@ Hardhat contract tests.
 - organizer permissions
 - category creation and validation
 - purchase success and failure cases
+- organizer payout on purchase
 - inventory tracking
 - ticket ownership after purchase
 - redemption rules

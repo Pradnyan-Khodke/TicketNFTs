@@ -18,6 +18,7 @@ Implemented:
 - per-event ticket categories with price, max supply, minted count, and remaining inventory
 - per-category transferability rules
 - purchase flow that mints ERC-721 tickets automatically
+- direct organizer payout on purchase
 - ticket ownership, transfer, and redemption lifecycle
 - redeemed tickets cannot be transferred
 - soul-bound categories that cannot be transferred after minting
@@ -52,7 +53,7 @@ Metadata is category-level:
 
 - each category stores one `metadataURI` on-chain
 - all tickets in that category share the same metadata file
-- on-chain data covers ownership, event/category references, redemption state, and transfer rules
+- on-chain data covers ownership, event/category references, redemption state, transfer rules, and organizer-directed payment settlement
 - off-chain IPFS data covers display metadata such as name, description, and image
 - the backend uploads metadata
 - the organizer wallet still signs `createCategory(...)`

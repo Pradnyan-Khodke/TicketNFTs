@@ -9,6 +9,7 @@ Solidity contract for the project.
   - organizer/admin event creation
   - ticket categories with price, supply, and transferability
   - purchase flow that mints tickets automatically
+  - ticket payments forwarded directly to the event organizer
   - one-time redemption
   - transfers blocked after redemption
   - soul-bound categories that cannot be transferred
