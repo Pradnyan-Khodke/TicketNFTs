@@ -45,6 +45,7 @@ Per ticket:
 - one contract handles the full ticket flow
 - metadata is category-level
 - transferability is category-level
+- purchase forwards ETH directly to the organizer of the selected event
 - a legacy owner-only `mintTicket(...)` helper still exists, but the main flow is purchase-based
 
 ## Usage

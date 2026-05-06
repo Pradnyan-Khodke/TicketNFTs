@@ -33,6 +33,7 @@ Main flows:
 - organizer/admin defines one or more ticket categories
 - buyer purchases from a category with remaining supply
 - purchase mints the NFT directly to the buyer
+- purchase forwards payment directly to the event organizer
 - owner can redeem once
 - redeemed tickets cannot be transferred
 - soul-bound categories cannot be transferred at all
@@ -70,6 +71,7 @@ The frontend provides:
 - purchase flow
 - My Tickets view for owned-ticket inspection, redemption, and transfer
 - Organizer view for event creation and category setup
+- a notice banner that can show confirmed transaction hashes
 
 Category creation is a two-step flow:
 
@@ -103,3 +105,7 @@ Not implemented:
 - resale or marketplace logic
 - royalty logic
 - public indexing layer
+
+One current caveat:
+
+- a failed transfer after redemption may not produce a Sepolia transaction hash if the wallet or provider stops the transaction before broadcast

@@ -324,6 +324,23 @@
   border-color: rgba(162, 41, 35, 0.22);
 }
 
+.notice-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.notice-link {
+  color: var(--accent-deep);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.notice-link:hover {
+  text-decoration: underline;
+}
+
 .view-nav {
   display: flex;
   gap: 12px;

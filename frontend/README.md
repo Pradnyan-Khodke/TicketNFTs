@@ -42,6 +42,8 @@ Optional:
 - fallback UI is shown if metadata or images cannot be loaded
 - transferability is shown in both category and owned-ticket views
 - organizer category creation uploads metadata through the backend, then sends `createCategory(...)` through MetaMask
+- successful on-chain actions surface the transaction hash in the notice banner
+- failed transfers only show a hash if the transaction is actually broadcast
 
 ## Run Locally
 

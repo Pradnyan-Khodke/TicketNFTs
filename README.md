@@ -24,6 +24,7 @@ Implemented:
 - soul-bound categories that cannot be transferred after minting
 - category-level NFT metadata stored as `ipfs://...` URIs
 - React frontend for browsing events, purchasing, viewing owned tickets, redeeming, and transferring
+- notice banner links to recent confirmed transaction hashes
 - local deployment flow
 - Sepolia deployment flow
 
@@ -57,6 +58,7 @@ Metadata is category-level:
 - off-chain IPFS data covers display metadata such as name, description, and image
 - the backend uploads metadata
 - the organizer wallet still signs `createCategory(...)`
+- confirmed Sepolia actions show a transaction hash in the notice banner
 
 This keeps the contract and frontend simple while still producing realistic NFT metadata.
 
@@ -120,6 +122,7 @@ npm run dev
 - create a category in the Organizer view
 - purchase a ticket in Events
 - inspect, transfer, or redeem the ticket in My Tickets
+- copy confirmed transaction hashes from the notice banner for the final report
 
 Manual metadata commands still exist if you want a script-only flow:
 
@@ -182,6 +185,7 @@ MetaMask notes:
 - frontend display depends on IPFS gateway availability
 - event discovery is intentionally minimal and on-chain only
 - transferability is set at the category level, not per individual ticket
+- a blocked transfer may not produce a hash if MetaMask or the provider stops it before broadcast
 
 ## Future Work
 

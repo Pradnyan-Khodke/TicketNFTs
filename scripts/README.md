@@ -69,6 +69,12 @@ Deploy to Sepolia:
 npm run deploy:sepolia
 ```
 
+Start the metadata backend:
+
+```bash
+npm run backend
+```
+
 Manual Sepolia metadata commands:
 
 ```bash

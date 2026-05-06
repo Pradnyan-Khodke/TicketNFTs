@@ -35,3 +35,4 @@ npm test
 - frontend UI tests
 - browser end-to-end tests
 - deployment script tests
+- whether a blocked transfer attempt gets broadcast and produces a public transaction hash

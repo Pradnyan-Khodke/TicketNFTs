@@ -26,6 +26,8 @@ type View = "events" | "tickets" | "organizer";
 type Notice = {
   message: string;
   tone: "error" | "info" | "success";
+  txHash?: string;
+  txUrl?: string;
 };
 
 type FormSubmitEvent = Parameters<
@@ -47,6 +49,46 @@ const initialCategoryForm = {
 
 function shortenAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function shortenHash(hash: string) {
+  return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+}
+
+function getExplorerTransactionUrl(chainId: string, txHash: string) {
+  if (chainId === "11155111") {
+    return `https://sepolia.etherscan.io/tx/${txHash}`;
+  }
+
+  return undefined;
+}
+
+function extractTransactionHash(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const maybeError = error as {
+    hash?: string;
+    transactionHash?: string;
+    transaction?: { hash?: string };
+    receipt?: { hash?: string };
+    info?: {
+      error?: {
+        data?: {
+          txHash?: string;
+        };
+      };
+    };
+  };
+
+  return (
+    maybeError.transactionHash ??
+    maybeError.transaction?.hash ??
+    maybeError.receipt?.hash ??
+    maybeError.info?.error?.data?.txHash ??
+    maybeError.hash
+  );
 }
 
 function getMetadataNetworkName(chainId: string) {
@@ -249,7 +291,7 @@ function App() {
   async function runAction(
     pendingMessage: string,
     successMessage: string,
-    action: (context: WalletContext) => Promise<void>
+    action: (context: WalletContext) => Promise<string | void>
   ) {
     setBusyLabel(pendingMessage);
     setNotice({
@@ -259,16 +301,27 @@ function App() {
 
     try {
       const context = await getWalletContext();
-      await action(context);
+      const txHash = (await action(context)) ?? undefined;
       await syncWallet(false);
       setNotice({
         message: successMessage,
         tone: "success",
+        txHash,
+        txUrl:
+          txHash !== undefined
+            ? getExplorerTransactionUrl(context.chainId.toString(), txHash)
+            : undefined,
       });
     } catch (error) {
+      const txHash = extractTransactionHash(error);
       setNotice({
         message: formatError(error),
         tone: "error",
+        txHash,
+        txUrl:
+          txHash !== undefined
+            ? getExplorerTransactionUrl(chainId, txHash)
+            : undefined,
       });
     } finally {
       setBusyLabel("");
@@ -319,6 +372,7 @@ function App() {
           { value: selectedCategory.price }
         );
         await tx.wait();
+        return tx.hash as string;
       }
     );
   }
@@ -330,6 +384,7 @@ function App() {
       async ({ contract }) => {
         const tx = await contract.redeem(tokenId);
         await tx.wait();
+        return tx.hash as string;
       }
     );
   }
@@ -371,6 +426,7 @@ function App() {
           tokenId
         );
         await tx.wait();
+        return tx.hash as string;
       }
     );
   }
@@ -396,6 +452,7 @@ function App() {
         await tx.wait();
         setEventForm(initialEventForm);
         setActiveView("events");
+        return tx.hash as string;
       }
     );
   }
@@ -470,6 +527,7 @@ function App() {
         categoryForm.transferable
       );
       await tx.wait();
+      const txHash = tx.hash as string;
       setCategoryForm((current) => ({
         ...initialCategoryForm,
         eventId: current.eventId,
@@ -478,13 +536,21 @@ function App() {
       setNotice({
         message: "Category created with uploaded metadata.",
         tone: "success",
+        txHash,
+        txUrl: getExplorerTransactionUrl(context.chainId.toString(), txHash),
       });
       setBusyLabel("");
       void syncWallet(false);
     } catch (error) {
+      const txHash = extractTransactionHash(error);
       setNotice({
         message: formatError(error),
         tone: "error",
+        txHash,
+        txUrl:
+          txHash !== undefined
+            ? getExplorerTransactionUrl(chainId, txHash)
+            : undefined,
       });
     } finally {
       setBusyLabel("");
@@ -604,6 +670,22 @@ function App() {
       <section className={`notice-banner ${notice.tone}`}>
         <p className="notice-label">{busyLabel || "Status"}</p>
         <p>{notice.message}</p>
+        {notice.txHash ? (
+          <div className="notice-meta">
+            <p className="detail-label">Transaction</p>
+            <p className="detail-value">{shortenHash(notice.txHash)}</p>
+            {notice.txUrl ? (
+              <a
+                className="notice-link"
+                href={notice.txUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                View on Etherscan
+              </a>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <nav className="view-nav" aria-label="Primary views">
